@@ -1856,13 +1856,26 @@ function renderFiches(main){
         await loadXLSXLib();
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type:'array', cellDates:true });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
-        if(!rows.length){ statusEl.textContent = 'Fichier vide.'; return; }
-        impHeaders = rows[0].map(h=>String(h||'').trim());
-        impRows = rows.slice(1).filter(r=>r.some(c=>String(c||'').trim()!==''));
+        const sheetNames = wb.SheetNames.filter(name=>{
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, defval:'', raw:true });
+          return rows.length>1 && rows.slice(1).some(r=>r.some(c=>String(c||'').trim()!==''));
+        });
+        if(!sheetNames.length){ statusEl.textContent = 'Fichier vide.'; return; }
+        // Every sheet is expected to share the same header row (e.g. one tab per
+        // gender, same columns) — the first non-empty sheet's header is used for
+        // the column mapping below, and every sheet's data rows are combined.
+        const firstRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetNames[0]], { header:1, defval:'', raw:true });
+        impHeaders = firstRows[0].map(h=>String(h||'').trim());
+        impRows = [];
+        const perSheetCounts = [];
+        sheetNames.forEach(name=>{
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, defval:'', raw:true });
+          const dataRows = rows.slice(1).filter(r=>r.some(c=>String(c||'').trim()!==''));
+          perSheetCounts.push(`${name} (${dataRows.length})`);
+          impRows.push(...dataRows);
+        });
         if(!impRows.length){ statusEl.textContent = 'Aucune ligne de données trouvée sous l\'en-tête.'; return; }
-        statusEl.textContent = `${impRows.length} ligne(s) trouvée(s) dans « ${file.name} ».`;
+        statusEl.textContent = `${impRows.length} ligne(s) trouvée(s) dans « ${file.name} », sur ${sheetNames.length} onglet(s) : ${perSheetCounts.join(', ')}.`;
         drawMapping();
       }catch(err){ statusEl.textContent = 'Erreur de lecture : '+(err.message||err); }
     });
@@ -2828,6 +2841,11 @@ function renderPresences(main){
       </div>
       <div class="presence-grid" id="pGrid"></div>
     </div>
+    ${collapsible("Historique (par jour, par mois)", `
+      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Pour un jour précis : changez simplement la date en haut de page — les statuts déjà enregistrés ce jour-là s'affichent. Pour une vue d'ensemble sur une période :</p>
+      <div class="field" style="max-width:220px;"><label>Mois</label><input type="month" id="pHistMonth" value="${todayISO().slice(0,7)}"></div>
+      <div class="table-wrap" id="pHistWrap" style="margin-top:10px;"></div>
+    `)}
     ${collapsible("Récapitulatif texte", `
       <p style="color:var(--muted); font-size:13px; margin-top:4px;">Liste texte — pratique à relire d'un coup d'œil ou à imprimer.</p>
       <div class="btn-row" style="margin-bottom:12px;"><button class="btn sm ghost" id="pPrint">${ICONS.print}Imprimer / exporter cette liste</button></div>
@@ -2845,7 +2863,15 @@ function renderPresences(main){
     }
     return g;
   }
-  function statusOf(g, id){ return (g && g.statuts[id]) || 'absent'; }
+  function statusOf(g, id){
+    const v = g && g.statuts[id];
+    if(!v) return 'absent';
+    return typeof v === 'object' ? v.v : v;
+  }
+  function statusMeta(g, id){
+    const v = g && g.statuts[id];
+    return (v && typeof v === 'object') ? v : null;
+  }
   function chambreOf(id){ return STATE.chambres.find(c=>(c.interneIds||[]).includes(id)); }
   function studentsFor(key){
     if(key==='all') return STATE.internes;
@@ -2862,17 +2888,22 @@ function renderPresences(main){
     const g = group(true);
     const cur = statusOf(g, id);
     const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1) % STATUS_ORDER.length];
-    if(next==='absent') delete g.statuts[id]; else g.statuts[id] = next;
+    if(next==='absent') delete g.statuts[id];
+    else g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
     persist('presences');
     drawAll();
+    const label = next==='present'?'Présent':next==='na'?'Non concerné':'Absent';
+    showToast(`${nomComplet(getInterne(id))} — ${label} ✓`);
   }
   function setAllStatus(status){
     const g = group(true);
     currentList().forEach(i=>{
-      if(status==='absent') delete g.statuts[i.id]; else g.statuts[i.id] = status;
+      if(status==='absent') delete g.statuts[i.id];
+      else g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
     });
     persist('presences');
     drawAll();
+    showToast('Statut mis à jour pour la sélection ✓');
   }
   function drawTabs(){
     const g = group(false);
@@ -2900,9 +2931,12 @@ function renderPresences(main){
     document.getElementById('pGrid').innerHTML = list.length? list.map(i=>{
       const c = chambreOf(i.id);
       const st = statusOf(g, i.id);
+      const meta = statusMeta(g, i.id);
       const cls = st==='present'?'present':st==='na'?'na':'';
       const icon = st==='present'?'✓':st==='na'?'–':'';
-      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${st==='present'?'Présent':st==='na'?'Non concerné':'Absent'} — cliquer pour changer">
+      const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':'Absent';
+      const metaLabel = meta? ` — ${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}` : '';
+      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel}${metaLabel} — cliquer pour changer">
         <div class="p-check">${icon}</div>
         <div class="p-avatar" id="pavatar-${i.id}">${initials(i)}</div>
         <div class="p-name">${nomComplet(i)}</div>
@@ -2929,7 +2963,33 @@ function renderPresences(main){
     document.getElementById('pSummaryWrap').innerHTML =
       col('Présents', presents) + col('Non concernés', nas, 'var(--amber)') + col('Absents', absents, 'var(--muted)');
   }
-  function drawAll(){ drawTabs(); drawGrid(); drawSummary(); }
+  function drawHistory(){
+    const monthInput = document.getElementById('pHistMonth');
+    if(!monthInput) return;
+    const month = monthInput.value;
+    const groups = STATE.presences.filter(g=>(g.date||'').startsWith(month));
+    const list = currentList();
+    const rows = list.map(i=>{
+      let present=0, na=0, absent=0, lastMeta=null;
+      groups.forEach(g=>{
+        const st = statusOf(g, i.id);
+        if(st==='present') present++; else if(st==='na') na++; else absent++;
+        const meta = statusMeta(g, i.id);
+        if(meta && (!lastMeta || meta.ts > lastMeta.ts)) lastMeta = meta;
+      });
+      return { i, present, na, absent, lastMeta };
+    });
+    document.getElementById('pHistWrap').innerHTML = (groups.length && rows.length) ? `
+      <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">${groups.length} appel(s) enregistré(s) ce mois-ci pour la sélection actuelle (onglet étage + recherche du haut).</p>
+      <table><thead><tr><th>Interne</th><th>Présent</th><th>Non concerné</th><th>Absent</th><th>Dernière modification</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td><span class="link-name" data-open-dossier="${r.i.id}">${nomComplet(r.i)}</span></td>
+        <td>${r.present}</td><td>${r.na}</td><td>${r.absent}</td>
+        <td style="font-size:12px; color:var(--muted);">${r.lastMeta? `${new Date(r.lastMeta.ts).toLocaleDateString('fr-BE')} ${new Date(r.lastMeta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})} — ${r.lastMeta.par}` : '—'}</td>
+      </tr>`).join('')}</tbody></table>
+    ` : `<div class="empty">Aucun appel enregistré pour ce mois.</div>`;
+  }
+  function drawAll(){ drawTabs(); drawGrid(); drawSummary(); drawHistory(); }
   document.getElementById('pAllPresent').addEventListener('click', ()=>setAllStatus('present'));
   document.getElementById('pAllReset').addEventListener('click', ()=>setAllStatus('absent'));
   document.getElementById('pPrint').onclick = ()=>{
@@ -2950,6 +3010,7 @@ function renderPresences(main){
   };
   ['pDate','pRepas'].forEach(id=>document.getElementById(id).addEventListener('change', drawAll));
   document.getElementById('pSearch').addEventListener('input', drawAll);
+  document.getElementById('pHistMonth').addEventListener('change', drawHistory);
   drawAll();
 }
 
@@ -3764,14 +3825,16 @@ function renderPlanning(main){
       </div>
     `; }).join('') : `<div class="empty">Aucun document${activeCat?' dans cette catégorie':''} pour le moment.</div>`;
     document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click', async ()=>{
+      const newTab = window.open('', '_blank'); // opened synchronously, right on the click, so browsers don't treat it as a popup
       const orig = b.textContent; b.disabled = true; b.textContent = 'Chargement…';
       try{
         const r = await window.storage.get('teamdoc:'+b.dataset.view, true);
         const blob = dataUriToBlob(r.value);
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        if(newTab) newTab.location.href = url;
+        else showToast('Votre navigateur a bloqué la fenêtre — autorisez les pop-ups pour ce site puis réessayez');
         setTimeout(()=>URL.revokeObjectURL(url), 60000);
-      }catch(e){ showToast('Erreur : '+(e.message||e)); }
+      }catch(e){ if(newTab) newTab.close(); showToast('Erreur : '+(e.message||e)); }
       b.disabled = false; b.textContent = orig;
     }));
     if(admin) document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
@@ -3821,7 +3884,7 @@ function renderPlanning(main){
 // to keep an archived year's view readable.
 const ARCHIVE_CATEGORIES = {
   sanctions: { label:'Sanctions', fmt:s=>`${fmtDate(s.date)} — ${nomComplet(getInterne(s.interneId))} — ${s.type}${s.type!=='Sanction civique'?' ('+(s.statut==='proposee'?'en attente':s.statut==='refusee'?'refusée':'validée')+')':''}${s.motif?' : '+s.motif:''}` },
-  presences: { label:'Présences', fmt:g=>{ const vals=Object.values(g.statuts||{}); return `${fmtDate(g.date)} — ${g.repas} — ${vals.filter(v=>v==='present').length} présent(s) / ${vals.length} statut(s) renseigné(s)`; } },
+  presences: { label:'Présences', fmt:g=>{ const vals=Object.values(g.statuts||{}).map(v=>typeof v==='object'?v.v:v); return `${fmtDate(g.date)} — ${g.repas} — ${vals.filter(v=>v==='present').length} présent(s) / ${vals.length} statut(s) renseigné(s)`; } },
   journal: { label:'Journal de bord', fmt:j=>`${fmtDate(j.date)} — ${j.type||'—'}${(j.internes||[]).length?' — '+j.internes.map(id=>nomComplet(getInterne(id))).join(', '):''} : ${(j.texte||'').slice(0,140)}` },
   sortiesSemaine: { label:'Sorties de la semaine', fmt:s=>`${fmtDate(s.date)} — ${nomComplet(getInterne(s.interneId))} — ${s.motif||'—'} (${s.statut||'—'})` },
   sortiesInternat: { label:'Sorties internat & coûts', fmt:s=>`${fmtDate(s.date)} — ${s.intitule||'—'}${s.type?' — '+s.type:''}${s.cout?' — '+Number(s.cout).toFixed(2)+' €':''}` },
