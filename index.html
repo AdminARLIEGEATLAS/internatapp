@@ -1040,7 +1040,11 @@ function openInterneDossier(id){
   const journalEntries = STATE.journal.filter(j=>(j.internes||[]).includes(id)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const infirmerieEntries = STATE.infirmerie.filter(r=>r.interneId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const traitementsActifs = STATE.traitements.filter(t=>t.interneId===id && t.actif!==false);
-  const recentAbsences = STATE.presences.filter(g=>(g.statuts||{})[id]==='absent').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
+  const recentAbsences = STATE.presences.filter(g=>{
+    const v = (g.statuts||{})[id];
+    const st = v ? (typeof v==='object'?v.v:v) : 'unchecked';
+    return st==='absent';
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
   const ventes = STATE.ventes.filter(v=>(v.vendeurId||v.interneId)===id);
   const totalVentes = ventes.reduce((a,v)=>a+Number(v.montant||0),0);
 
@@ -2835,9 +2839,9 @@ function renderEtages(main){
 /* ============================= PRESENCES ============================= */
 function renderPresences(main){
   let activeEtage = 'all';
-  const STATUS_ORDER = ['absent','present','na'];
+  const STATUS_ORDER = ['unchecked','present','na','absent'];
   main.innerHTML = `
-    <div class="page-head"><div class="icon-badge">${ICONS.presences}</div><div><h2>Présences</h2><p>Appel aux repas — cliquez sur un interne pour faire défiler son statut (absent → présent → non concerné). Une carte en pointillés = pas encore vérifiée aujourd'hui.</p></div></div>
+    <div class="page-head"><div class="icon-badge">${ICONS.presences}</div><div><h2>Présences</h2><p>Appel aux repas — cliquez sur un interne pour faire défiler son statut (présent → non concerné → absent → à zéro). Une carte en pointillés = pas encore vérifiée.</p></div></div>
     <div class="card">
       <div class="grid-form">
         <div class="field"><label>Date</label><input type="date" id="pDate" value="${todayISO()}"></div>
@@ -2845,17 +2849,18 @@ function renderPresences(main){
         <div class="field" style="grid-column:span 2;"><label>Rechercher un nom</label><input id="pSearch" placeholder="Rechercher..."></div>
       </div>
     </div>
+    <div id="pValidationBox"></div>
     <div class="card">
       <div class="type-tabs" id="pEtageTabs"></div>
       <div class="stats-row" id="pStatsRow"></div>
       <div class="btn-row" style="margin-bottom:14px;">
         <button class="btn sm" id="pAllPresent">${ICONS.presences||''} Tout cocher présent (sélection)</button>
-        <button class="btn sm ghost" id="pAllReset">Tout remettre à absent</button>
+        <button class="btn sm ghost" id="pAllReset">Tout remettre à zéro (sélection)</button>
       </div>
       <div class="presence-grid" id="pGrid"></div>
     </div>
-    ${collapsible("Historique (par jour, par mois)", `
-      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Pour un jour précis : changez simplement la date en haut de page — les statuts déjà enregistrés ce jour-là s'affichent. Pour une vue d'ensemble sur une période :</p>
+    ${collapsible("Historique (chaque jour, chaque repas)", `
+      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Un jour par ligne, un repas par colonne — vert et confirmé = l'appel a été validé ; ambre = encodé mais pas encore confirmé ; tiret = rien d'encodé ce jour-là pour ce repas.</p>
       <div class="field" style="max-width:220px;"><label>Mois</label><input type="month" id="pHistMonth" value="${todayISO().slice(0,7)}"></div>
       <div class="table-wrap" id="pHistWrap" style="margin-top:10px;"></div>
     `)}
@@ -2868,7 +2873,7 @@ function renderPresences(main){
   function group(createIfMissing){
     const date=document.getElementById('pDate').value, repas=document.getElementById('pRepas').value;
     let g = STATE.presences.find(p=>p.date===date && p.repas===repas);
-    if(!g && createIfMissing){ g={id:uid(), date, repas, statuts:{}}; STATE.presences.push(g); }
+    if(!g && createIfMissing){ g={id:uid(), date, repas, statuts:{}, valide:null}; STATE.presences.push(g); }
     if(g && !g.statuts){
       // Migrate older records that only stored a plain list of "present" ids.
       g.statuts = {};
@@ -2878,7 +2883,7 @@ function renderPresences(main){
   }
   function statusOf(g, id){
     const v = g && g.statuts[id];
-    if(!v) return 'absent';
+    if(!v) return 'unchecked';
     return typeof v === 'object' ? v.v : v;
   }
   function statusMeta(g, id){
@@ -2901,13 +2906,12 @@ function renderPresences(main){
     const g = group(true);
     const cur = statusOf(g, id);
     const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1) % STATUS_ORDER.length];
-    // Always keep a record, even for "absent" — otherwise "checked and marked
-    // absent" and "nobody has looked at this person yet" look identical, which
-    // is exactly what made the team unsure whether the appel had really run.
-    g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
+    if(next==='unchecked') delete g.statuts[id];
+    else g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
+    if(g.valide) g.valide = null; // data changed since confirmation — needs reconfirming
     persist('presences');
     drawAll();
-    const label = next==='present'?'Présent':next==='na'?'Non concerné':'Absent';
+    const label = next==='present'?'Présent':next==='na'?'Non concerné':next==='absent'?'Absent':'Remis à zéro';
     showToast(`${nomComplet(getInterne(id))} — ${label} ✓`);
     const card = document.querySelector(`.presence-card[data-id="${id}"]`);
     if(card){ card.classList.remove('just-updated'); void card.offsetWidth; card.classList.add('just-updated'); }
@@ -2915,11 +2919,38 @@ function renderPresences(main){
   function setAllStatus(status){
     const g = group(true);
     currentList().forEach(i=>{
-      g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
+      if(status==='unchecked') delete g.statuts[i.id];
+      else g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
     });
+    if(g.valide) g.valide = null;
     persist('presences');
     drawAll();
     showToast('Statut mis à jour pour la sélection ✓');
+  }
+  function drawValidation(){
+    const box = document.getElementById('pValidationBox');
+    if(!box) return;
+    const g = group(false);
+    const full = STATE.internes;
+    const checked = full.filter(i=>statusMeta(g,i.id)).length;
+    if(g && g.valide){
+      box.innerHTML = `<div style="background:var(--green-light); border:1px solid var(--green); border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="color:var(--green);"><b>✓ Appel confirmé</b> par ${g.valide.par} à ${new Date(g.valide.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>
+        <button class="btn sm ghost" id="pUnconfirm">Annuler la confirmation</button>
+      </div>`;
+      document.getElementById('pUnconfirm').onclick = ()=>{ g.valide=null; persist('presences'); drawValidation(); };
+    } else {
+      const ready = full.length>0 && checked===full.length;
+      box.innerHTML = `<div style="background:${ready?'var(--amber-light)':'var(--bg)'}; border:1px solid ${ready?'var(--amber)':'var(--line)'}; border-radius:10px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="color:${ready?'#8a6300':'var(--muted)'};"><b>Appel non confirmé</b> — ${checked} / ${full.length} internes vérifiés au total${ready?'' : ' — encodez tout le monde pour pouvoir confirmer'}</div>
+        <button class="btn sm" id="pConfirm" ${ready?'':'disabled'}>Confirmer l'appel de ce repas</button>
+      </div>`;
+      if(ready) document.getElementById('pConfirm').onclick = ()=>{
+        const g2 = group(true);
+        g2.valide = { par: currentUserName(), ts: Date.now() };
+        persist('presences'); showToast('Appel confirmé ✓'); drawValidation();
+      };
+    }
   }
   function drawTabs(){
     const g = group(false);
@@ -2938,22 +2969,22 @@ function renderPresences(main){
     const list = currentList();
     const presents = list.filter(i=>statusOf(g,i.id)==='present').length;
     const nas = list.filter(i=>statusOf(g,i.id)==='na').length;
-    const checked = list.filter(i=>statusMeta(g,i.id)).length;
+    const absents = list.filter(i=>statusOf(g,i.id)==='absent').length;
     document.getElementById('pStatsRow').innerHTML = `
-      <div class="stat-card" style="--accent:var(--blue);"><div class="n">${checked} / ${list.length}</div><div class="l">Vérifiés (sélection)</div></div>
+      <div class="stat-card" style="--accent:var(--blue);"><div class="n">${presents+nas+absents} / ${list.length}</div><div class="l">Vérifiés (sélection)</div></div>
       <div class="stat-card" style="--accent:var(--green);"><div class="n">${presents}</div><div class="l">Présents (sélection)</div></div>
       <div class="stat-card" style="--accent:var(--amber);"><div class="n">${nas}</div><div class="l">Non concernés (sélection)</div></div>
-      <div class="stat-card" style="--accent:var(--red);"><div class="n">${list.length - presents - nas}</div><div class="l">Absents (sélection)</div></div>
+      <div class="stat-card" style="--accent:var(--red);"><div class="n">${absents}</div><div class="l">Absents (sélection)</div></div>
     `;
     document.getElementById('pGrid').innerHTML = list.length? list.map(i=>{
       const c = chambreOf(i.id);
       const st = statusOf(g, i.id);
       const meta = statusMeta(g, i.id);
-      const cls = st==='present'?'present':st==='na'?'na':meta?'absent-checked':'unchecked';
-      const icon = st==='present'?'✓':st==='na'?'–':meta?'×':'';
-      const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':meta?'Absent (vérifié)':'Pas encore vérifié';
+      const cls = st==='present'?'present':st==='na'?'na':st==='absent'?'absent-checked':'unchecked';
+      const icon = st==='present'?'✓':st==='na'?'–':st==='absent'?'×':'';
+      const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':st==='absent'?'Absent (vérifié)':'Pas encore vérifié';
       const metaLine = meta? `<div class="p-meta">${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>` : `<div class="p-meta">À faire</div>`;
-      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel} — cliquer pour changer">
+      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel} — cliquer pour changer (4 clics reviennent à zéro)">
         <div class="p-check">${icon}</div>
         <div class="p-avatar" id="pavatar-${i.id}">${initials(i)}</div>
         <div class="p-name">${nomComplet(i)}</div>
@@ -2979,45 +3010,48 @@ function renderPresences(main){
         ${items.length? `<ul style="margin:0; padding-left:18px; font-size:13.5px; line-height:1.9; ${color?'color:'+color+';':''}">${items.map(i=>`<li>${nomComplet(i)}</li>`).join('')}</ul>` : `<div class="empty">Aucun</div>`}
       </div>`;
     document.getElementById('pSummaryWrap').innerHTML =
-      col('Présents', presents) + col('Non concernés', nas, 'var(--amber)') + col('Absents', absents, 'var(--muted)');
+      col('Présents', presents) + col('Non concernés', nas, 'var(--amber)') + col('Absents', absents, 'var(--red)');
   }
   function drawHistory(){
     const monthInput = document.getElementById('pHistMonth');
-    if(!monthInput) return;
-    const month = monthInput.value;
-    const groups = STATE.presences.filter(g=>(g.date||'').startsWith(month));
-    const list = currentList();
-    const rows = list.map(i=>{
-      let present=0, na=0, absent=0, lastMeta=null;
-      groups.forEach(g=>{
-        const st = statusOf(g, i.id);
-        if(st==='present') present++; else if(st==='na') na++; else absent++;
-        const meta = statusMeta(g, i.id);
-        if(meta && (!lastMeta || meta.ts > lastMeta.ts)) lastMeta = meta;
+    if(!monthInput || !monthInput.value) return;
+    const [y,m] = monthInput.value.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const repasList = ['Petit-déjeuner','Dîner','Goûter','Souper'];
+    const total = STATE.internes.length;
+    const rows = [];
+    for(let d=1; d<=daysInMonth; d++){
+      const dateStr = `${y}-${pad2(m)}-${pad2(d)}`;
+      const cells = repasList.map(repas=>{
+        const g = STATE.presences.find(p=>p.date===dateStr && p.repas===repas);
+        if(!g) return { state:'none' };
+        const checked = STATE.internes.filter(i=>statusMeta(g,i.id)).length;
+        if(g.valide) return { state:'confirmed', par:g.valide.par, ts:g.valide.ts, checked };
+        if(checked>0) return { state:'partial', checked };
+        return { state:'none' };
       });
-      return { i, present, na, absent, lastMeta };
-    });
-    document.getElementById('pHistWrap').innerHTML = (groups.length && rows.length) ? `
-      <p style="font-size:12px; color:var(--muted); margin-bottom:8px;">${groups.length} appel(s) enregistré(s) ce mois-ci pour la sélection actuelle (onglet étage + recherche du haut).</p>
-      <table><thead><tr><th>Interne</th><th>Présent</th><th>Non concerné</th><th>Absent</th><th>Dernière modification</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr>
-        <td><span class="link-name" data-open-dossier="${r.i.id}">${nomComplet(r.i)}</span></td>
-        <td>${r.present}</td><td>${r.na}</td><td>${r.absent}</td>
-        <td style="font-size:12px; color:var(--muted);">${r.lastMeta? `${new Date(r.lastMeta.ts).toLocaleDateString('fr-BE')} ${new Date(r.lastMeta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})} — ${r.lastMeta.par}` : '—'}</td>
-      </tr>`).join('')}</tbody></table>
+      if(cells.some(c=>c.state!=='none')) rows.push({ dateStr, cells });
+    }
+    document.getElementById('pHistWrap').innerHTML = rows.length? `
+      <table><thead><tr><th>Date</th>${repasList.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
+      <tbody>${rows.slice().reverse().map(r=>`<tr><td>${fmtDate(r.dateStr)}</td>${r.cells.map(c=>{
+        if(c.state==='confirmed') return `<td><span class="badge green" title="Confirmé par ${c.par}">✓ ${c.checked}/${total}</span></td>`;
+        if(c.state==='partial') return `<td><span class="badge amber">${c.checked}/${total} — non confirmé</span></td>`;
+        return `<td style="color:var(--muted);">—</td>`;
+      }).join('')}</tr>`).join('')}</tbody></table>
     ` : `<div class="empty">Aucun appel enregistré pour ce mois.</div>`;
   }
-  function drawAll(){ drawTabs(); drawGrid(); drawSummary(); drawHistory(); }
+  function drawAll(){ drawTabs(); drawGrid(); drawSummary(); drawHistory(); drawValidation(); }
   document.getElementById('pAllPresent').addEventListener('click', ()=>setAllStatus('present'));
-  document.getElementById('pAllReset').addEventListener('click', ()=>setAllStatus('absent'));
+  document.getElementById('pAllReset').addEventListener('click', ()=>setAllStatus('unchecked'));
   document.getElementById('pPrint').onclick = ()=>{
     const g = group(false);
     const list = currentList();
     const date = document.getElementById('pDate').value, repas = document.getElementById('pRepas').value;
-    const label = st => st==='present'?'Présent':st==='na'?'Non concerné':'Absent';
+    const label = st => st==='present'?'Présent':st==='na'?'Non concerné':st==='absent'?'Absent':'Non vérifié';
     const presents = list.filter(i=>statusOf(g,i.id)==='present').length;
     const body = `
-      <div class="section-title">${fmtDate(date)} — ${repas}</div>
+      <div class="section-title">${fmtDate(date)} — ${repas}${g&&g.valide?' — Confirmé par '+g.valide.par:' — Non confirmé'}</div>
       <table><thead><tr><th>Interne</th><th>Chambre</th><th>Statut</th></tr></thead>
       <tbody>${list.map(i=>{ const c=chambreOf(i.id);
         return `<tr><td>${nomComplet(i)}</td><td>${c?c.nom:'—'}</td><td>${label(statusOf(g,i.id))}</td></tr>`;
