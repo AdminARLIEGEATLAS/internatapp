@@ -237,13 +237,19 @@ tr:hover td{background:var(--blue-light);}
 .presence-card:hover{box-shadow:var(--shadow-lift); transform:translateY(-2px); border-color:var(--blue-light);}
 .presence-card.present{border-color:var(--green); background:var(--green-light);}
 .presence-card.na{border-color:var(--amber); background:var(--amber-light); opacity:.85;}
+.presence-card.absent-checked{border-color:var(--red); background:var(--red-light);}
+.presence-card.unchecked{border-style:dashed; border-color:var(--line-strong);}
 .presence-card .p-avatar{width:56px; height:56px; border-radius:12px; overflow:hidden; background:var(--blue-light); display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:19px; color:var(--blue-dark); flex:0 0 56px;}
 .presence-card .p-avatar img{width:100%; height:100%; object-fit:cover; display:block;}
 .presence-card .p-name{font-size:12.5px; font-weight:700; line-height:1.25; color:var(--ink);}
 .presence-card .p-room{font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
+.presence-card .p-meta{font-size:9.5px; color:var(--muted); margin-top:-4px;}
 .presence-card .p-check{position:absolute; top:8px; right:8px; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--line-strong); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; transition:all .15s;}
 .presence-card.present .p-check{background:var(--green); border-color:var(--green);}
 .presence-card.na .p-check{background:var(--amber); border-color:var(--amber);}
+.presence-card.absent-checked .p-check{background:var(--red); border-color:var(--red);}
+@keyframes presenceConfirm{0%{transform:scale(1);} 35%{transform:scale(.93);} 60%{box-shadow:0 0 0 6px rgba(30,142,90,.25);} 100%{transform:scale(1); box-shadow:none;}}
+.presence-card.just-updated{animation:presenceConfirm .45s ease;}
 
 .filters{display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
 .filters select, .filters input{width:auto; min-width:150px;}
@@ -913,7 +919,7 @@ const TAB_DEFS = [
   {id:'garde', label:'Rapport de garde'},
   {id:'communications', label:'Communications Direction'},
   {id:'equipe', label:"Gestion de l'équipe"},
-  {id:'planning', label:'Planning éducateurs'},
+  {id:'planning', label:'Documents de l\'année'},
   {id:'photos', label:'Galerie photos'},
   {id:'ventes', label:'Ventes & collectes'},
   {id:'sauvegarde', label:'Sauvegarde'},
@@ -2831,7 +2837,7 @@ function renderPresences(main){
   let activeEtage = 'all';
   const STATUS_ORDER = ['absent','present','na'];
   main.innerHTML = `
-    <div class="page-head"><div class="icon-badge">${ICONS.presences}</div><div><h2>Présences</h2><p>Appel aux repas — cliquez sur un interne pour faire défiler son statut (absent → présent → non concerné).</p></div></div>
+    <div class="page-head"><div class="icon-badge">${ICONS.presences}</div><div><h2>Présences</h2><p>Appel aux repas — cliquez sur un interne pour faire défiler son statut (absent → présent → non concerné). Une carte en pointillés = pas encore vérifiée aujourd'hui.</p></div></div>
     <div class="card">
       <div class="grid-form">
         <div class="field"><label>Date</label><input type="date" id="pDate" value="${todayISO()}"></div>
@@ -2895,18 +2901,21 @@ function renderPresences(main){
     const g = group(true);
     const cur = statusOf(g, id);
     const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1) % STATUS_ORDER.length];
-    if(next==='absent') delete g.statuts[id];
-    else g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
+    // Always keep a record, even for "absent" — otherwise "checked and marked
+    // absent" and "nobody has looked at this person yet" look identical, which
+    // is exactly what made the team unsure whether the appel had really run.
+    g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
     persist('presences');
     drawAll();
     const label = next==='present'?'Présent':next==='na'?'Non concerné':'Absent';
     showToast(`${nomComplet(getInterne(id))} — ${label} ✓`);
+    const card = document.querySelector(`.presence-card[data-id="${id}"]`);
+    if(card){ card.classList.remove('just-updated'); void card.offsetWidth; card.classList.add('just-updated'); }
   }
   function setAllStatus(status){
     const g = group(true);
     currentList().forEach(i=>{
-      if(status==='absent') delete g.statuts[i.id];
-      else g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
+      g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
     });
     persist('presences');
     drawAll();
@@ -2917,8 +2926,8 @@ function renderPresences(main){
     const tabs = [{key:'all', label:'Tous'}, ...STATE.etages.map(e=>({key:e.id, label:e.nom})), {key:'none', label:'Non assignés'}];
     document.getElementById('pEtageTabs').innerHTML = tabs.map(t=>{
       const students = studentsFor(t.key);
-      const count = students.filter(i=>statusOf(g,i.id)==='present').length;
-      return `<button class="type-tab ${activeEtage===t.key?'active':''}" data-etage="${t.key}">${t.label} (${count}/${students.length})</button>`;
+      const checked = students.filter(i=>statusMeta(g,i.id)).length;
+      return `<button class="type-tab ${activeEtage===t.key?'active':''}" data-etage="${t.key}">${t.label} (${checked}/${students.length})</button>`;
     }).join('');
     document.querySelectorAll('#pEtageTabs .type-tab').forEach(b=>b.addEventListener('click',()=>{
       activeEtage = b.dataset.etage; drawAll();
@@ -2929,25 +2938,27 @@ function renderPresences(main){
     const list = currentList();
     const presents = list.filter(i=>statusOf(g,i.id)==='present').length;
     const nas = list.filter(i=>statusOf(g,i.id)==='na').length;
+    const checked = list.filter(i=>statusMeta(g,i.id)).length;
     document.getElementById('pStatsRow').innerHTML = `
+      <div class="stat-card" style="--accent:var(--blue);"><div class="n">${checked} / ${list.length}</div><div class="l">Vérifiés (sélection)</div></div>
       <div class="stat-card" style="--accent:var(--green);"><div class="n">${presents}</div><div class="l">Présents (sélection)</div></div>
       <div class="stat-card" style="--accent:var(--amber);"><div class="n">${nas}</div><div class="l">Non concernés (sélection)</div></div>
-      <div class="stat-card" style="--accent:var(--gray);"><div class="n">${list.length - presents - nas}</div><div class="l">Absents (sélection)</div></div>
-      <div class="stat-card" style="--accent:var(--blue);"><div class="n">${list.length}</div><div class="l">Total affiché</div></div>
+      <div class="stat-card" style="--accent:var(--red);"><div class="n">${list.length - presents - nas}</div><div class="l">Absents (sélection)</div></div>
     `;
     document.getElementById('pGrid').innerHTML = list.length? list.map(i=>{
       const c = chambreOf(i.id);
       const st = statusOf(g, i.id);
       const meta = statusMeta(g, i.id);
-      const cls = st==='present'?'present':st==='na'?'na':'';
-      const icon = st==='present'?'✓':st==='na'?'–':'';
-      const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':'Absent';
-      const metaLabel = meta? ` — ${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}` : '';
-      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel}${metaLabel} — cliquer pour changer">
+      const cls = st==='present'?'present':st==='na'?'na':meta?'absent-checked':'unchecked';
+      const icon = st==='present'?'✓':st==='na'?'–':meta?'×':'';
+      const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':meta?'Absent (vérifié)':'Pas encore vérifié';
+      const metaLine = meta? `<div class="p-meta">${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>` : `<div class="p-meta">À faire</div>`;
+      return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel} — cliquer pour changer">
         <div class="p-check">${icon}</div>
         <div class="p-avatar" id="pavatar-${i.id}">${initials(i)}</div>
         <div class="p-name">${nomComplet(i)}</div>
         <div class="p-room">${c?c.nom:'—'}</div>
+        ${metaLine}
       </div>`;
     }).join('') : `<div class="empty">Aucun interne à afficher.</div>`;
     document.querySelectorAll('.presence-card').forEach(card=>card.addEventListener('click',()=>cycleStatus(card.dataset.id)));
@@ -3780,6 +3791,7 @@ const PLANNING_CATEGORIES = [
   { key:'reunions', label:'Réunions', color:'green' },
   { key:'gardes', label:'Gardes du dimanche', color:'amber' },
   { key:'fonctions', label:'Fonction de chacun', color:'violet' },
+  { key:'internes', label:'Documents internes', color:'red' },
 ];
 function planningCatMeta(key){ return PLANNING_CATEGORIES.find(x=>x.key===key) || { label:key, color:'gray' }; }
 function dataUriToBlob(dataUri){
@@ -3794,7 +3806,7 @@ function renderPlanning(main){
   const admin = isAdmin();
   let activeCat = '';
   main.innerHTML = `
-    <div class="page-head"><div class="icon-badge">${ICONS.planning}</div><div><h2>Planning éducateurs</h2><p>Horaires, réunions, gardes du dimanche et fonction de chacun — les documents de référence de l'équipe, au même endroit.</p></div></div>
+    <div class="page-head"><div class="icon-badge">${ICONS.planning}</div><div><h2>Documents de l'année</h2><p>Horaires, réunions, gardes du dimanche, fonction de chacun et documents concernant les internes — au même endroit.</p></div></div>
     ${admin?collapsible("Ajouter un document", `
       <div class="grid-form" style="margin-top:4px;">
         <div class="field"><label>Catégorie</label><select id="pdCategorie">${PLANNING_CATEGORIES.map(c=>`<option value="${c.key}">${c.label}</option>`).join('')}</select></div>
