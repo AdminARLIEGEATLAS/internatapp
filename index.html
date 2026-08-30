@@ -1495,13 +1495,13 @@ function parseDateFlexible(v){
   }
   return '';
 }
-function buildInterneFromRow(row, mapping){
+function buildInterneFromRow(row, mapping, genreHint){
   const val = key => { const idx = mapping[key]; return (idx!==undefined && idx>=0) ? row[idx] : ''; };
   const nom = String(val('nom')||'').trim();
   if(!nom) return null;
   return {
     id: uid(), nom, prenom: String(val('prenom')||'').trim(),
-    genre: normalizeGenre(val('genre')), ecole: String(val('ecole')||'').trim(),
+    genre: normalizeGenre(val('genre')) || genreHint || '', ecole: String(val('ecole')||'').trim(),
     classe: String(val('classe')||'').trim(), statut: normalizeStatut(val('statut')),
     responsable: String(val('responsable')||'').trim(),
     telPapa: String(val('telPapa')||'').trim(), telMaman: String(val('telMaman')||'').trim(), telInterne: String(val('telInterne')||'').trim(),
@@ -1557,7 +1557,8 @@ function renderFiches(main){
   `;
   function filtered(){
     const eco=document.getElementById('fEcole').value, gn=document.getElementById('fGenre').value, st=document.getElementById('fStatut').value, q=document.getElementById('fSearch').value.trim().toLowerCase();
-    return STATE.internes.filter(i=>(!eco||i.ecole===eco)&&(!gn||i.genre===gn)&&(!st||i.statut===st)&&(!q||nomComplet(i).toLowerCase().includes(q)));
+    return STATE.internes.filter(i=>(!eco||i.ecole===eco)&&(!gn||i.genre===gn)&&(!st||i.statut===st)&&(!q||nomComplet(i).toLowerCase().includes(q)))
+      .sort((a,b)=>nomComplet(a).localeCompare(nomComplet(b)));
   }
   document.getElementById('fPrintAll').onclick = ()=>{
     const list = filtered().slice().sort((a,b)=>nomComplet(a).localeCompare(nomComplet(b)));
@@ -1786,7 +1787,7 @@ function renderFiches(main){
     };
   });
   if(admin){
-    let impHeaders = null, impRows = null;
+    let impHeaders = null, impRows = null, impRowGenreHints = [];
     function currentMapping(){
       const mapping = {};
       document.querySelectorAll('.imp-map').forEach(sel=>{ mapping[sel.dataset.field] = Number(sel.value); });
@@ -1795,7 +1796,7 @@ function renderFiches(main){
     function existingKey(i){ return normalizeHeader(i.nom)+'|'+normalizeHeader(i.prenom); }
     function drawPreview(){
       const mapping = currentMapping();
-      const built = impRows.map(r=>buildInterneFromRow(r, mapping)).filter(Boolean);
+      const built = impRows.map((r,idx)=>buildInterneFromRow(r, mapping, impRowGenreHints[idx])).filter(Boolean);
       const preview = built.slice(0,5);
       document.getElementById('impPreview').innerHTML = preview.length? `
         <table><thead><tr><th>Nom</th><th>Prénom</th><th>Genre</th><th>École</th><th>Classe</th><th>Statut</th><th>Naissance</th></tr></thead>
@@ -1821,7 +1822,7 @@ function renderFiches(main){
       document.querySelectorAll('.imp-map').forEach(sel=>sel.addEventListener('change', drawPreview));
       drawPreview();
       document.getElementById('impCancel').onclick = ()=>{
-        impHeaders = null; impRows = null;
+        impHeaders = null; impRows = null; impRowGenreHints = [];
         document.getElementById('impFile').value = '';
         document.getElementById('impStatus').textContent = '';
         wrap.style.display = 'none'; wrap.innerHTML = '';
@@ -1832,8 +1833,8 @@ function renderFiches(main){
         const existing = new Set(STATE.internes.map(existingKey));
         const seenInFile = new Set();
         let added=0, skippedExisting=0, skippedEmpty=0;
-        impRows.forEach(r=>{
-          const rec = buildInterneFromRow(r, mapping);
+        impRows.forEach((r,idx)=>{
+          const rec = buildInterneFromRow(r, mapping, impRowGenreHints[idx]);
           if(!rec){ skippedEmpty++; return; }
           const k = existingKey(rec);
           if(existing.has(k) || seenInFile.has(k)){ skippedExisting++; return; }
@@ -1867,12 +1868,18 @@ function renderFiches(main){
         const firstRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetNames[0]], { header:1, defval:'', raw:true });
         impHeaders = firstRows[0].map(h=>String(h||'').trim());
         impRows = [];
+        impRowGenreHints = [];
         const perSheetCounts = [];
         sheetNames.forEach(name=>{
           const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, defval:'', raw:true });
           const dataRows = rows.slice(1).filter(r=>r.some(c=>String(c||'').trim()!==''));
           perSheetCounts.push(`${name} (${dataRows.length})`);
+          // No "genre" column in the file? If a sheet is named "Garçons" / "Filles"
+          // (or similar), every row from that sheet inherits that gender — used
+          // as a fallback only when the row itself has no explicit genre value.
+          const sheetGenreHint = normalizeGenre(name);
           impRows.push(...dataRows);
+          dataRows.forEach(()=>impRowGenreHints.push(sheetGenreHint));
         });
         if(!impRows.length){ statusEl.textContent = 'Aucune ligne de données trouvée sous l\'en-tête.'; return; }
         statusEl.textContent = `${impRows.length} ligne(s) trouvée(s) dans « ${file.name} », sur ${sheetNames.length} onglet(s) : ${perSheetCounts.join(', ')}.`;
