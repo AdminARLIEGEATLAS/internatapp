@@ -1117,18 +1117,18 @@ function nomComplet(i){ return i? `${i.nom} ${i.prenom||''}`.trim() : '—'; }
 // Educators who can also sell in Ventes & collectes campaigns (e.g. the candy sale),
 // alongside internes.
 const EDUCATEURS = ['Caroline','Muriel','Myriam','Jonathan','Grégory','Cédric','Pascal','Benjamin'];
-function vendeurOptions(){
-  return `<optgroup label="Internes">${internesOptions(STATE.internes)}</optgroup>` +
-    `<optgroup label="Éducateurs">${EDUCATEURS.map(n=>`<option value="edu:${n}">${n}</option>`).join('')}</optgroup>`;
+// Ventes entries: an éducateur organizes/sells, an interne buys and owes the
+// money. acheteurId is the interne who bought; educateur is a plain name from
+// the team list. Older records only had "vendeurId" (interne or "edu:<Name>")
+// — read as a best-effort fallback so old data still displays sensibly.
+function acheteurLabel(v){
+  const id = v.acheteurId || (v.vendeurId && !v.vendeurId.startsWith('edu:') ? v.vendeurId : null) || v.interneId;
+  return id ? nomComplet(getInterne(id)) : '—';
 }
-// Ventes entries store the raw select value in vendeurId — either an interne id
-// or "edu:<Name>". This resolves it back to a display label either way, and
-// stays backward compatible with older entries that used the field "interneId".
-function vendeurLabel(v){
-  const raw = v.vendeurId || v.interneId;
-  if(!raw) return '—';
-  if(raw.startsWith('edu:')) return raw.slice(4)+' (éducateur)';
-  return nomComplet(getInterne(raw));
+function educateurLabel(v){
+  if(v.educateur) return v.educateur;
+  if(v.vendeurId && v.vendeurId.startsWith('edu:')) return v.vendeurId.slice(4);
+  return '—';
 }
 function goTab(id){ ACTIVE_TAB=id; SELECTED_INTERNE=null; renderShell(); renderTab(); }
 // The imported "notes" field packs allergy info as free text (e.g. "Allergies : Non"
@@ -3544,7 +3544,7 @@ function renderVentes(main){
   let activeCampagne = '';
   const admin = isAdmin();
   main.innerHTML = `
-    <div class="page-head"><div class="icon-badge">${ICONS.ventes}</div><div><h2>Ventes & collectes</h2><p>Suivi des ventes (chocolats, gaufres...) et de l'argent récolté, par interne ou par éducateur.</p></div></div>
+    <div class="page-head"><div class="icon-badge">${ICONS.ventes}</div><div><h2>Ventes & collectes</h2><p>Un éducateur organise et vend (chocolats, gaufres...), un interne achète et doit le montant — suivi ici par interne, pour que chaque paiement soit identifiable.</p></div></div>
     ${collapsible("Compte bancaire de l'internat (pour les QR codes de paiement)", `
       <p style="color:var(--muted); font-size:13px; margin-top:4px;">Utilisé pour générer des QR codes de paiement SEPA — à renseigner une fois. ${admin?'':'Modifiable par la Direction uniquement.'}</p>
       <div class="grid-form">
@@ -3555,34 +3555,37 @@ function renderVentes(main){
       ${admin?`<div class="btn-row" style="margin-top:8px;"><button class="btn sm" id="cptSave">Enregistrer</button></div>`:''}
     `)}
     <div class="card">
-      <h3>Nouvelle ligne de vente<small>Le nom de la campagne peut être réutilisé pour regrouper plusieurs ventes (ex : « Vente de chocolats 2026 »).</small></h3>
+      <h3>Nouvelle ligne de vente<small>Le nom de la campagne peut être réutilisé pour regrouper plusieurs ventes (ex : « Vente de chocolats 2026 »). L'interne choisi ci-dessous est celui qui doit le montant — c'est son nom qui apparaîtra sur le QR de paiement.</small></h3>
       <div class="grid-form">
         <div class="field" style="grid-column:span 2;"><label>Campagne</label><input id="vCampagne" list="vCampagneList" placeholder="ex : Vente de chocolats 2026"><datalist id="vCampagneList"></datalist></div>
-        <div class="field"><label>Vendeur</label><select id="vVendeur"><option value="">— Choisir —</option>${vendeurOptions()}</select></div>
+        <div class="field"><label>Éducateur (vendeur)</label><select id="vEducateur"><option value="">— Choisir —</option>${EDUCATEURS.map(n=>`<option value="${n}"${n===currentUserName()?' selected':''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label>Date</label><input type="date" id="vDate" value="${todayISO()}"></div>
       </div>
       <div class="grid-form">
-        <div class="field"><label>Quantité vendue</label><input type="number" id="vQuantite" min="0" value="0"></div>
+        <div class="field" style="grid-column:span 2;"><label>Interne (acheteur)</label><select id="vAcheteur"><option value="">— Choisir —</option>${internesOptions(STATE.internes)}</select></div>
+        <div class="field"><label>Quantité achetée</label><input type="number" id="vQuantite" min="0" value="0"></div>
         <div class="field"><label>Prix unitaire (€)</label><input type="number" step="0.01" id="vPrixUnitaire" value="0"></div>
-        <div class="field"><label>Montant collecté (€)</label><input type="number" step="0.01" id="vMontant" placeholder="Calculé automatiquement si vide"></div>
-        <div class="field" style="display:flex; align-items:flex-end;"><label class="check-row"><input type="checkbox" id="vPaye" checked>Montant remis à l'internat</label></div>
+      </div>
+      <div class="grid-form">
+        <div class="field"><label>Montant dû (€)</label><input type="number" step="0.01" id="vMontant" placeholder="Calculé automatiquement si vide"></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><label class="check-row"><input type="checkbox" id="vPaye">Payé</label></div>
       </div>
       <div class="btn-row" style="margin-top:10px;"><button class="btn" id="vAdd">Ajouter</button></div>
     </div>
-    ${collapsible("Générer un QR de paiement pour tout un vendeur/campagne", `
-      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Pratique pour demander en une fois le montant encore dû par un vendeur sur toute une campagne, plutôt que ligne par ligne.</p>
+    ${collapsible("Générer un QR de paiement pour tout un interne/campagne", `
+      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Pratique pour demander en une fois le montant total encore dû par un interne sur toute une campagne, plutôt que ligne par ligne.</p>
       <div class="grid-form">
         <div class="field"><label>Campagne</label><select id="qrCampagne"><option value="">— Choisir —</option></select></div>
-        <div class="field"><label>Vendeur</label><select id="qrVendeur"><option value="">— Choisir —</option></select></div>
+        <div class="field"><label>Interne</label><select id="qrAcheteur"><option value="">— Choisir —</option></select></div>
       </div>
       <div id="qrCampagneTotal" style="font-size:13px; margin:8px 0;"></div>
       <div class="btn-row"><button class="btn sm" id="qrCampagneGo">Générer le QR pour ce total</button></div>
     `)}
     <div class="card">
       <div class="filters">
-        <input id="vSearch" placeholder="Rechercher un vendeur...">
+        <input id="vSearch" placeholder="Rechercher un interne...">
         <select id="vFilterCampagne"><option value="">Toutes les campagnes</option></select>
-        <select id="vFilterType"><option value="">Internes & éducateurs</option><option value="interne">Internes uniquement</option><option value="edu">Éducateurs uniquement</option></select>
+        <select id="vFilterEducateur"><option value="">Tous les éducateurs</option>${EDUCATEURS.map(n=>`<option>${n}</option>`).join('')}</select>
       </div>
       <div class="stats-row" id="vStatsRow"></div>
       <div class="btn-row" style="margin-bottom:12px;"><button class="btn sm ghost" id="vPrint">${ICONS.print}Imprimer / exporter le récapitulatif</button></div>
@@ -3606,62 +3609,62 @@ function renderVentes(main){
     const qrCampCur = qrCampSel.value;
     qrCampSel.innerHTML = '<option value="">— Choisir —</option>' + opts.map(c=>`<option ${c===qrCampCur?'selected':''}>${c}</option>`).join('');
   }
-  function refreshQrVendeurs(){
+  function refreshQrAcheteurs(){
     const campagne = document.getElementById('qrCampagne').value;
-    const ids = [...new Set(STATE.ventes.filter(v=>v.campagne===campagne).map(v=>v.vendeurId||v.interneId))];
-    document.getElementById('qrVendeur').innerHTML = '<option value="">— Choisir —</option>' + ids.map(id=>`<option value="${id}">${vendeurLabel({vendeurId:id})}</option>`).join('');
+    const ids = [...new Set(STATE.ventes.filter(v=>v.campagne===campagne).map(v=>v.acheteurId).filter(Boolean))];
+    document.getElementById('qrAcheteur').innerHTML = '<option value="">— Choisir —</option>' + ids.map(id=>`<option value="${id}">${nomComplet(getInterne(id))}</option>`).join('');
     drawQrCampagneTotal();
   }
   function drawQrCampagneTotal(){
     const campagne = document.getElementById('qrCampagne').value;
-    const vendeurId = document.getElementById('qrVendeur').value;
+    const acheteurId = document.getElementById('qrAcheteur').value;
     const el = document.getElementById('qrCampagneTotal');
-    if(!campagne || !vendeurId){ el.textContent=''; return; }
-    const rows = STATE.ventes.filter(v=>v.campagne===campagne && (v.vendeurId||v.interneId)===vendeurId);
+    if(!campagne || !acheteurId){ el.textContent=''; return; }
+    const rows = STATE.ventes.filter(v=>v.campagne===campagne && v.acheteurId===acheteurId);
     const total = rows.reduce((a,v)=>a+Number(v.montant||0),0);
     const resteADevoir = rows.filter(v=>!v.paye).reduce((a,v)=>a+Number(v.montant||0),0);
-    el.innerHTML = `Total de la campagne pour ce vendeur : <b>${total.toFixed(2)} €</b> — dont <b>${resteADevoir.toFixed(2)} €</b> pas encore remis à l'internat.`;
+    el.innerHTML = `Total dû sur la campagne pour cet interne : <b>${total.toFixed(2)} €</b> — dont <b>${resteADevoir.toFixed(2)} €</b> pas encore payé.`;
   }
-  document.getElementById('qrCampagne').addEventListener('change', refreshQrVendeurs);
-  document.getElementById('qrVendeur').addEventListener('change', drawQrCampagneTotal);
+  document.getElementById('qrCampagne').addEventListener('change', refreshQrAcheteurs);
+  document.getElementById('qrAcheteur').addEventListener('change', drawQrCampagneTotal);
   document.getElementById('qrCampagneGo').onclick = ()=>{
     const campagne = document.getElementById('qrCampagne').value;
-    const vendeurId = document.getElementById('qrVendeur').value;
-    if(!campagne || !vendeurId){ showToast('Choisissez une campagne et un vendeur'); return; }
-    const rows = STATE.ventes.filter(v=>v.campagne===campagne && (v.vendeurId||v.interneId)===vendeurId);
+    const acheteurId = document.getElementById('qrAcheteur').value;
+    if(!campagne || !acheteurId){ showToast('Choisissez une campagne et un interne'); return; }
+    const rows = STATE.ventes.filter(v=>v.campagne===campagne && v.acheteurId===acheteurId);
     const resteADevoir = rows.filter(v=>!v.paye).reduce((a,v)=>a+Number(v.montant||0),0);
-    if(resteADevoir<=0){ showToast('Rien à réclamer : déjà remis à l\'internat'); return; }
-    showQrModal(resteADevoir, `${campagne} — ${vendeurLabel({vendeurId})}`);
+    if(resteADevoir<=0){ showToast('Rien à réclamer : déjà payé'); return; }
+    showQrModal(resteADevoir, `${campagne} — ${nomComplet(getInterne(acheteurId))}`);
   };
   function filteredRows(){
-    const typeFilter = document.getElementById('vFilterType').value;
+    const eduFilter = document.getElementById('vFilterEducateur').value;
     const q = normalizeHeader(document.getElementById('vSearch').value);
     return STATE.ventes.filter(v=>{
       if(activeCampagne && v.campagne!==activeCampagne) return false;
-      const raw = v.vendeurId || v.interneId || '';
-      if(typeFilter==='edu' && !raw.startsWith('edu:')) return false;
-      if(typeFilter==='interne' && raw.startsWith('edu:')) return false;
-      if(q && !normalizeHeader(vendeurLabel(v)).includes(q)) return false;
+      if(eduFilter && educateurLabel(v)!==eduFilter) return false;
+      if(q && !normalizeHeader(acheteurLabel(v)).includes(q)) return false;
       return true;
     }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   }
   function drawStats(rows){
     const totalQte = rows.reduce((a,v)=>a+Number(v.quantite||0),0);
     const totalMontant = rows.reduce((a,v)=>a+Number(v.montant||0),0);
-    const totalRemis = rows.filter(v=>v.paye).reduce((a,v)=>a+Number(v.montant||0),0);
+    const totalPaye = rows.filter(v=>v.paye).reduce((a,v)=>a+Number(v.montant||0),0);
     document.getElementById('vStatsRow').innerHTML = `
       <div class="stat-card" style="--accent:var(--blue);"><div class="n">${totalQte}</div><div class="l">Unités vendues</div></div>
-      <div class="stat-card" style="--accent:var(--green);"><div class="n">${totalMontant.toFixed(2)}\u00A0€</div><div class="l">Total collecté</div></div>
-      <div class="stat-card" style="--accent:var(--amber);"><div class="n">${(totalMontant-totalRemis).toFixed(2)}\u00A0€</div><div class="l">Reste à remettre</div></div>
+      <div class="stat-card" style="--accent:var(--green);"><div class="n">${totalMontant.toFixed(2)}\u00A0€</div><div class="l">Total dû</div></div>
+      <div class="stat-card" style="--accent:var(--amber);"><div class="n">${(totalMontant-totalPaye).toFixed(2)}\u00A0€</div><div class="l">Reste à percevoir</div></div>
     `;
   }
   function drawTable(){
     const rows = filteredRows();
     drawStats(rows);
     document.getElementById('vTableWrap').innerHTML = rows.length? `
-      <table><thead><tr><th>Campagne</th><th>Date</th><th>Vendeur</th><th>Quantité</th><th>Montant</th><th>Remis ?</th><th></th></tr></thead>
+      <table><thead><tr><th>Campagne</th><th>Date</th><th>Interne (acheteur)</th><th>Éducateur</th><th>Quantité</th><th>Montant</th><th>Payé ?</th><th></th></tr></thead>
       <tbody>${rows.map(v=>`<tr>
-        <td>${v.campagne||'—'}</td><td>${fmtDate(v.date)}</td><td>${vendeurLabel(v)}</td>
+        <td>${v.campagne||'—'}</td><td>${fmtDate(v.date)}</td>
+        <td><span class="link-name" data-open-dossier="${v.acheteurId||''}">${acheteurLabel(v)}</span></td>
+        <td>${educateurLabel(v)}</td>
         <td>${v.quantite||0}</td><td>${Number(v.montant||0).toFixed(2)} €</td>
         <td>${v.paye?'<span class="badge green">Oui</span>':'<span class="badge amber">Non</span>'}</td>
         <td><div class="btn-row"><button class="btn sm ghost" data-qr="${v.id}" title="Générer un QR de paiement">QR</button><button class="btn sm danger" data-del="${v.id}">${ICONS.trash}</button></div></td>
@@ -3669,8 +3672,8 @@ function renderVentes(main){
     ` : `<div class="empty">Aucune vente enregistrée${activeCampagne?' pour cette campagne':''}.</div>`;
     document.querySelectorAll('[data-qr]').forEach(b=>b.addEventListener('click',()=>{
       const v = STATE.ventes.find(x=>x.id===b.dataset.qr);
-      if(!v) return;
-      showQrModal(v.montant, `${v.campagne||''} — ${vendeurLabel(v)} — ${fmtDate(v.date)}`);
+      if(!v || !v.acheteurId){ showToast('Aucun interne acheteur renseigné pour cette ligne'); return; }
+      showQrModal(v.montant, `${v.campagne||''} — ${acheteurLabel(v)} — ${fmtDate(v.date)}`);
     }));
     document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
       STATE.ventes = STATE.ventes.filter(x=>x.id!==b.dataset.del); persist('ventes'); drawAll();
@@ -3678,28 +3681,31 @@ function renderVentes(main){
   }
   function drawAll(){ refreshCampagneOptions(); drawTable(); }
   document.getElementById('vFilterCampagne').addEventListener('change', e=>{ activeCampagne = e.target.value; drawAll(); });
-  document.getElementById('vFilterType').addEventListener('change', drawAll);
+  document.getElementById('vFilterEducateur').addEventListener('change', drawAll);
   document.getElementById('vSearch').addEventListener('input', drawAll);
   document.getElementById('vAdd').onclick=()=>{
     const campagne = document.getElementById('vCampagne').value.trim();
-    const vendeurId = document.getElementById('vVendeur').value;
-    if(!campagne || !vendeurId){ showToast('Campagne et vendeur requis'); return; }
+    const educateur = document.getElementById('vEducateur').value;
+    const acheteurId = document.getElementById('vAcheteur').value;
+    if(!campagne || !educateur || !acheteurId){ showToast('Campagne, éducateur et interne acheteur requis'); return; }
     const quantite = Number(document.getElementById('vQuantite').value)||0;
     const prixUnitaire = Number(document.getElementById('vPrixUnitaire').value)||0;
     const montantInput = document.getElementById('vMontant').value;
     const montant = montantInput!==''? Number(montantInput) : quantite*prixUnitaire;
-    STATE.ventes.push({id:uid(), campagne, vendeurId, date:document.getElementById('vDate').value, quantite, prixUnitaire, montant, paye:document.getElementById('vPaye').checked});
+    STATE.ventes.push({id:uid(), campagne, educateur, acheteurId, date:document.getElementById('vDate').value, quantite, prixUnitaire, montant, paye:document.getElementById('vPaye').checked});
     persist('ventes'); showToast('Vente ajoutée'); drawAll();
     ['vQuantite','vMontant'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('vQuantite').value = '0';
+    document.getElementById('vAcheteur').value = '';
+    document.getElementById('vPaye').checked = false;
   };
   document.getElementById('vPrint').onclick = ()=>{
     const rows = filteredRows();
     let totalQte=0, totalMontant=0;
     const body = `
-      <table><thead><tr><th>Campagne</th><th>Date</th><th>Vendeur</th><th>Quantité</th><th>Montant</th><th>Remis</th></tr></thead>
+      <table><thead><tr><th>Campagne</th><th>Date</th><th>Interne</th><th>Éducateur</th><th>Quantité</th><th>Montant</th><th>Payé</th></tr></thead>
       <tbody>${rows.map(v=>{ totalQte+=Number(v.quantite||0); totalMontant+=Number(v.montant||0);
-        return `<tr><td>${v.campagne||'—'}</td><td>${fmtDate(v.date)}</td><td>${vendeurLabel(v)}</td><td>${v.quantite||0}</td><td>${Number(v.montant||0).toFixed(2)} €</td><td>${v.paye?'Oui':'Non'}</td></tr>`;
+        return `<tr><td>${v.campagne||'—'}</td><td>${fmtDate(v.date)}</td><td>${acheteurLabel(v)}</td><td>${educateurLabel(v)}</td><td>${v.quantite||0}</td><td>${Number(v.montant||0).toFixed(2)} €</td><td>${v.paye?'Oui':'Non'}</td></tr>`;
       }).join('')}</tbody></table>
       <div class="section-title">${totalQte} unité(s) — ${totalMontant.toFixed(2)} € au total</div>
     `;
@@ -3944,7 +3950,7 @@ const ARCHIVE_CATEGORIES = {
   sortiesExceptionnelles: { label:'Entraînements exceptionnels', fmt:s=>`${fmtDate(s.date)} — ${nomComplet(getInterne(s.interneId))}${s.description?' — '+s.description:''}` },
   infirmerie: { label:'Carnet infirmerie', fmt:i=>`${fmtDate(i.date)} — ${nomComplet(getInterne(i.interneId))} — ${i.type}${i.description?' : '+i.description:''}` },
   communications: { label:'Communications Direction', fmt:c=>`${fmtDate(c.date)} — ${c.titre||'—'} (${c.type||'—'}) — publié par ${c.publiePar||'—'}` },
-  ventes: { label:'Ventes & collectes', fmt:v=>`${v.date?fmtDate(v.date):'—'} — ${v.campagne||'—'} — ${vendeurLabel(v)} — ${Number(v.montant||0).toFixed(2)} €` },
+  ventes: { label:'Ventes & collectes', fmt:v=>`${v.date?fmtDate(v.date):'—'} — ${v.campagne||'—'} — ${acheteurLabel(v)} (vendu par ${educateurLabel(v)}) — ${Number(v.montant||0).toFixed(2)} €` },
   rapportsGarde: { label:'Rapports de garde', fmt:r=>`${fmtDate(r.date)} — rédigé par ${r.educateur||'—'}${r.communs?' — '+r.communs.slice(0,80):''}` },
   traitementsPris: { label:'Suivi des prises de traitements', fmt:p=>`${fmtDate(p.date)} — ${p.horaire} — ${nomComplet(getInterne(STATE.traitements.find(t=>t.id===p.traitementId)?.interneId))} — donné par ${p.donnePar||'—'}` },
   chambres: { label:'Occupation des chambres (photo de fin d\'année)', fmt:c=>`${c.nom} — ${(c.interneIds||[]).map(id=>nomComplet(getInterne(id))).join(', ')||'Vide'}` },
