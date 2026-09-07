@@ -2879,6 +2879,18 @@ function renderPresences(main){
       g.statuts = {};
       (g.internes||[]).forEach(id=>{ g.statuts[id] = 'present'; });
     }
+    if(g && g.statuts){
+      // Normalize any legacy plain-string status values (from before per-change
+      // attribution existed) into the {v,par,ts} object format. Without this,
+      // these entries read a real status via statusOf() but statusMeta() saw
+      // them as untouched — the exact split causing "99/99 vérifiés" in one
+      // count and "82/99" in another for the same selection.
+      Object.keys(g.statuts).forEach(id=>{
+        if(g.statuts[id] && typeof g.statuts[id] !== 'object'){
+          g.statuts[id] = { v: g.statuts[id], par: 'Historique', ts: 0 };
+        }
+      });
+    }
     return g;
   }
   function statusOf(g, id){
@@ -2983,7 +2995,7 @@ function renderPresences(main){
       const cls = st==='present'?'present':st==='na'?'na':st==='absent'?'absent-checked':'unchecked';
       const icon = st==='present'?'✓':st==='na'?'–':st==='absent'?'×':'';
       const stLabel = st==='present'?'Présent':st==='na'?'Non concerné':st==='absent'?'Absent (vérifié)':'Pas encore vérifié';
-      const metaLine = meta? `<div class="p-meta">${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>` : `<div class="p-meta">À faire</div>`;
+      const metaLine = meta? (meta.ts? `<div class="p-meta">${meta.par}, ${new Date(meta.ts).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>` : `<div class="p-meta">${meta.par}</div>`) : `<div class="p-meta">À faire</div>`;
       return `<div class="presence-card ${cls}" data-id="${i.id}" title="${stLabel} — cliquer pour changer (4 clics reviennent à zéro)">
         <div class="p-check">${icon}</div>
         <div class="p-avatar" id="pavatar-${i.id}">${initials(i)}</div>
