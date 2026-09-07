@@ -739,18 +739,18 @@ async function loadAll(){
     }
   });
   if(migratedHealth) await persist('internes');
-  // One-time migration: chambres used to hold a single occupant via
-  // "interneId". Moving to a capacity + list-of-occupants model so a chambre
-  // can hold several internes (chambres à deux, appartements jusqu'à 4).
+  // Chambres have used the capacité + occupant-list model (interneIds) for a
+  // long time now — the one-time migration from the old single-"interneId"
+  // format has been removed. It used to reset interneIds to [] whenever the
+  // field wasn't recognised as an array, which was safe only for genuinely
+  // old records; if any future bug or serialization hiccup ever made
+  // interneIds look non-array for a chambre that still had real occupants,
+  // that code would have silently wiped them on the next load. This only
+  // fills in a missing capacité, and never touches interneIds.
   let migratedChambres = false;
   STATE.chambres.forEach(c=>{
-    if(!Array.isArray(c.interneIds)){
-      c.interneIds = c.interneId ? [c.interneId] : [];
-      delete c.interneId;
-      migratedChambres = true;
-    }
-    if(!c.capacite){
-      c.capacite = Math.max(1, c.interneIds.length);
+    if(c.capacite===undefined || c.capacite===null){
+      c.capacite = Math.max(1, (c.interneIds||[]).length);
       migratedChambres = true;
     }
   });
@@ -1215,6 +1215,13 @@ function renderAccueil(main){
       <button class="btn sm" onclick="goTab('sanctions')">Examiner les propositions →</button>
     </div>
     `:''}
+    ${(isAdmin() && (joursDepuisDerniereSauvegarde()===null || joursDepuisDerniereSauvegarde()>30))?`
+    <div class="card" style="background:var(--amber-light,#FFF3CD); border-color:var(--amber);">
+      <h3 style="color:var(--amber-dark,#8a6300);">⚠ ${joursDepuisDerniereSauvegarde()===null?'Aucune sauvegarde manuelle n\'a jamais été téléchargée':'Dernière sauvegarde manuelle il y a '+joursDepuisDerniereSauvegarde()+' jours'}</h3>
+      <p style="font-size:13px; margin:0 0 10px;">Un export régulier (.json) permet de récupérer facilement des données en cas de problème technique — ça prend 10 secondes.</p>
+      <button class="btn sm" onclick="goTab('sauvegarde')">Exporter une sauvegarde →</button>
+    </div>
+    `:''}
 
     <div class="two-col">
       <div class="card">
@@ -1408,6 +1415,11 @@ function collapsibleSub(title, innerHtml, opts={}){
   </details>`;
 }
 function isSanctionCounted(s){ return s.type==='Sanction civique' || s.statut==='validee'; }
+function joursDepuisDerniereSauvegarde(){
+  const ts = STATE.settings && STATE.settings.derniereSauvegardeManuelle;
+  if(!ts) return null;
+  return Math.floor((Date.now()-ts)/(1000*60*60*24));
+}
 function genreBadge(g){
   if(g==='Fille') return '<span class="badge violet">Fille</span>';
   if(g==='Garçon') return '<span class="badge blue">Garçon</span>';
@@ -2625,11 +2637,17 @@ function renderEtages(main){
     `, {open:true})}
     ${collapsible('Assigner un interne à une chambre', `
       <div class="grid-form" style="margin-top:4px;">
-        <div class="field"><label>Interne</label><select id="asInterne"></select></div>
+        <div class="field"><label>Interne(s)<small>Maintenez Ctrl (Cmd sur Mac) pour en sélectionner plusieurs — pratique pour remplir une chambre d'un coup.</small></label><select id="asInterne" multiple size="6"></select></div>
         <div class="field"><label>Chambre</label><select id="asChambre"></select></div>
       </div>
       <div class="btn-row" style="margin-top:8px;"><button class="btn sm" id="asAdd">Assigner</button></div>
     `, {open:true})}
+    ${collapsible("Importer les chambres depuis un fichier Excel", `
+      <p style="color:var(--muted); font-size:13px; margin-top:4px;">Reconnaît directement le format « plan d'étage » habituel : un code de chambre (ex. « I204 ») en en-tête de colonne, avec les occupants listés juste en dessous. Les lignes « ETAGE », « Référent(e)s », « Occupé(e)s »/« Libres » et les chambres réservées aux éducateurs sont ignorées automatiquement. Les internes sont retrouvés par nom (et prénom si besoin, en cas d'homonymes) parmi les fiches déjà encodées — rien n'est créé, seule l'assignation à une chambre change.</p>
+      <input type="file" id="chImpFile" accept=".xlsx,.xls,.csv">
+      <div id="chImpStatus" style="margin-top:8px; font-size:12.5px; color:var(--muted);"></div>
+      <div id="chImpResult" style="margin-top:10px;"></div>
+    `)}
     <div class="card">
       <h3>Occupation des chambres<small>Une chambre mise au mauvais étage par erreur ? Changez son étage directement dans la colonne dédiée — les occupants restent assignés, rien n'est perdu. Supprimer une chambre ou un étage libère les internes concernés (ils repassent dans « Internes non assignés » juste en dessous), sans jamais toucher à leur fiche.</small></h3>
       <div id="etTableWrap"></div>
@@ -2649,7 +2667,7 @@ function renderEtages(main){
   function refreshSelects(){
     document.getElementById('chEtage').innerHTML = STATE.etages.map(e=>`<option value="${e.id}">${e.nom}</option>`).join('') || '<option value="">Aucun étage</option>';
     const unassigned = STATE.internes.filter(i=>!STATE.chambres.some(c=>(c.interneIds||[]).includes(i.id)));
-    document.getElementById('asInterne').innerHTML = '<option value="">— Choisir —</option>' + internesOptions(unassigned);
+    document.getElementById('asInterne').innerHTML = unassigned.length? internesOptions(unassigned) : '<option value="" disabled>Aucun interne non assigné</option>';
     document.getElementById('asChambre').innerHTML = '<option value="">— Choisir —</option>' + STATE.chambres.slice().sort((a,b)=>{
       const ea=STATE.etages.find(e=>e.id===a.etageId), eb=STATE.etages.find(e=>e.id===b.etageId);
       return (ea?ea.nom:'').localeCompare(eb?eb.nom:'') || a.nom.localeCompare(b.nom);
@@ -2660,6 +2678,140 @@ function renderEtages(main){
       return `<option value="${c.id}" ${libres<=0?'disabled':''}>${label}</option>`;
     }).join('');
   }
+  document.getElementById('chImpFile').addEventListener('change', async e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const statusEl = document.getElementById('chImpStatus');
+    const resultEl = document.getElementById('chImpResult');
+    resultEl.innerHTML = '';
+    statusEl.textContent = 'Lecture du fichier…';
+    try{
+      await loadXLSXLib();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array', cellDates:true });
+
+      // --- "Plan d'étage" parser: chambre codes (ex. "I204", "I101Double",
+      // "I 213") sit as column headers, on their own row or shared with a
+      // capacity word ("Double"/"Simple"), with occupant names in the row(s)
+      // right below — the same layout used on paper/whiteboards for room
+      // planning. Étage titles, "Référent(e)s", "Occupé(e)s"/"Libres" summary
+      // rows, and educateur-reserved rooms are recognised and skipped.
+      const CODE_RE = /^I\s?(\d{3,4})/i;
+      const TYPE_WORDS_RE = /^(double|simple|\d\s?lits?.*|educateurs?|educatrices?)$/i;
+      const SKIP_NAMES_RE = /^(educateur|educatrice|educateurs|educatrices|douches?)$/i;
+      const cleanName = v => String(v==null?'':v).replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
+      const isCodeRow = row => row.some(v=>v && CODE_RE.test(String(v).trim()));
+      const isTypeRow = (row, cols) => {
+        let hits=0, total=0;
+        cols.forEach(c=>{
+          const v = row[c];
+          if(v==null || String(v).trim()==='') return;
+          total++; if(TYPE_WORDS_RE.test(String(v).trim())) hits++;
+        });
+        return total>0 && hits===total;
+      };
+      function parseFloorPlan(grid){
+        const found = new Map(); // code -> { etage, names:[] }
+        const orphans = [];
+        let etage = null, r = 0;
+        while(r < grid.length){
+          const row = grid[r];
+          const first = String(row[0]==null?'':row[0]).trim();
+          if(/^etage/i.test(first)){ etage = first; r++; continue; }
+          if(isCodeRow(row)){
+            const codeCols = new Map();
+            row.forEach((v,c)=>{
+              if(v==null) return;
+              const m = CODE_RE.exec(String(v).trim());
+              if(m){ const code = 'I'+m[1]; codeCols.set(c, code); if(!found.has(code)) found.set(code, {etage, names:[]}); }
+            });
+            r++;
+            if(r<grid.length && isTypeRow(grid[r], [...codeCols.keys()])) r++;
+            while(r < grid.length){
+              const nrow = grid[r];
+              const nfirst = String(nrow[0]==null?'':nrow[0]).trim();
+              if(isCodeRow(nrow) || /^etage/i.test(nfirst) || /^(occup|libre)/i.test(nfirst)) break;
+              const blank = row2=>row2.every(v=>v==null||String(v).trim()==='');
+              if(blank(nrow) && (r+1>=grid.length || blank(grid[r+1]))) break;
+              nrow.forEach((v,c)=>{
+                const name = cleanName(v);
+                if(!name || SKIP_NAMES_RE.test(name)) return;
+                if(codeCols.has(c)) found.get(codeCols.get(c)).names.push(name);
+                else orphans.push({ etage, row:r+1, col:c+1, name });
+              });
+              r++;
+            }
+            continue;
+          }
+          r++;
+        }
+        return { found, orphans };
+      }
+
+      const combinedFound = new Map();
+      const combinedOrphans = [];
+      wb.SheetNames.forEach(name=>{
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header:1, defval:null, raw:true });
+        if(!rows.length) return;
+        const { found, orphans } = parseFloorPlan(rows);
+        found.forEach((v,k)=>combinedFound.set(k, v));
+        combinedOrphans.push(...orphans);
+      });
+      if(!combinedFound.size){ statusEl.textContent = "Aucun code de chambre (ex. « I204 ») reconnu dans ce fichier."; return; }
+
+      // Index existing internes for name matching: exact "nom+prénom" first,
+      // falling back to "nom" alone only when it's unambiguous.
+      const byFull = new Map(), byNomOnly = new Map();
+      STATE.internes.forEach(i=>{
+        byFull.set(normalizeHeader((i.nom||'')+(i.prenom||'')), i);
+        const nk = normalizeHeader(i.nom||'');
+        if(!byNomOnly.has(nk)) byNomOnly.set(nk, []);
+        byNomOnly.get(nk).push(i);
+      });
+      const chambreIndex = new Map();
+      STATE.chambres.forEach(c=>chambreIndex.set(normalizeHeader(c.nom), c));
+
+      let assigned = 0;
+      const issues = combinedOrphans.map(o=>`« ${o.name} » (${o.etage||'étage inconnu'}) — position dans le fichier ambiguë, à assigner manuellement`);
+      combinedFound.forEach((info, code)=>{
+        const chambre = chambreIndex.get(normalizeHeader(code));
+        info.names.forEach(fullName=>{
+          // Sheet gives one "NOM Prénom(s)" cell, surname in ALL CAPS (often
+          // several words) followed by the prénom(s) in normal case.
+          const parts = fullName.split(' ').filter(Boolean);
+          const isAllCaps = w => w===w.toUpperCase() && w!==w.toLowerCase();
+          let splitAt = parts.findIndex(w=>!isAllCaps(w));
+          if(splitAt===-1) splitAt = Math.max(1, parts.length-1);
+          if(splitAt===0) splitAt = 1;
+          const rowNom = parts.slice(0,splitAt).join(' ');
+          const rowPrenom = parts.slice(splitAt).join(' ');
+          let interne = byFull.get(normalizeHeader(rowNom+rowPrenom)) || byFull.get(normalizeHeader(fullName));
+          if(!interne){
+            const candidates = byNomOnly.get(normalizeHeader(rowNom)) || [];
+            if(candidates.length===1) interne = candidates[0];
+            else if(candidates.length>1){ issues.push(`${fullName} (${code}) — plusieurs internes portent ce nom, à assigner manuellement`); return; }
+          }
+          if(!interne){ issues.push(`${fullName} (${code}) — interne introuvable parmi les fiches`); return; }
+          if(!chambre){ issues.push(`${nomComplet(interne)} — chambre « ${code} » introuvable dans l'application`); return; }
+          STATE.chambres.forEach(c=>{ c.interneIds = (c.interneIds||[]).filter(id=>id!==interne.id); });
+          const libres = Math.max(0, (chambre.capacite||1) - (chambre.interneIds||[]).length);
+          if(libres<=0){ issues.push(`${nomComplet(interne)} — chambre « ${chambre.nom} » complète`); return; }
+          chambre.interneIds = [...(chambre.interneIds||[]), interne.id];
+          assigned++;
+        });
+      });
+      if(assigned>0) await persist('chambres');
+      statusEl.textContent = `${assigned} interne(s) assigné(s)${issues.length? ' — '+issues.length+' à vérifier ci-dessous.':' avec succès.'}`;
+      resultEl.innerHTML = issues.length? `
+        <div style="text-align:left; background:var(--amber-light); border-radius:8px; padding:10px 14px; color:#8a6300; font-size:13px;">
+          <b>${issues.length} ligne(s) non assignée(s) :</b>
+          <ul style="margin:6px 0 0; padding-left:20px;">${issues.map(t=>`<li>${t}</li>`).join('')}</ul>
+        </div>
+      ` : '';
+      refreshSelects(); drawTables();
+      document.getElementById('chImpFile').value = '';
+    }catch(err){ statusEl.textContent = 'Erreur de lecture : '+(err.message||err); }
+  });
   document.getElementById('etAdd').onclick=()=>{
     const nom=document.getElementById('etNom').value.trim();
     if(!nom){ showToast('Nom requis'); return; }
@@ -2673,12 +2825,20 @@ function renderEtages(main){
     persist('chambres'); document.getElementById('chNom').value=''; refreshSelects(); drawTables(); showToast('Chambre ajoutée');
   };
   document.getElementById('asAdd').onclick=()=>{
-    const interneId=document.getElementById('asInterne').value, chambreId=document.getElementById('asChambre').value;
-    if(!interneId||!chambreId){ showToast('Interne et chambre requis'); return; }
+    const interneIds=[...document.getElementById('asInterne').selectedOptions].map(o=>o.value).filter(Boolean);
+    const chambreId=document.getElementById('asChambre').value;
+    if(!interneIds.length||!chambreId){ showToast('Au moins un interne et une chambre requis'); return; }
     const c=STATE.chambres.find(c=>c.id===chambreId);
-    if(!c || placesLibres(c)<=0){ showToast('Cette chambre est complète'); return; }
-    c.interneIds = [...(c.interneIds||[]), interneId];
-    persist('chambres'); refreshSelects(); drawTables(); showToast('Interne assigné');
+    if(!c){ showToast('Chambre introuvable'); return; }
+    const libres = placesLibres(c);
+    if(libres<=0){ showToast('Cette chambre est complète'); return; }
+    const toAssign = interneIds.slice(0, libres);
+    const overflow = interneIds.length - toAssign.length;
+    c.interneIds = [...(c.interneIds||[]), ...toAssign];
+    persist('chambres'); refreshSelects(); drawTables();
+    showToast(overflow>0
+      ? `${toAssign.length} assigné(s) — ${overflow} non assigné(s), plus assez de place dans cette chambre`
+      : `${toAssign.length} interne(s) assigné(s)`);
   };
   function removeEtageCascade(etageId){
     const chambreIds = new Set(STATE.chambres.filter(c=>c.etageId===etageId).map(c=>c.id));
@@ -4028,6 +4188,7 @@ function renderSauvegarde(main){
     <div class="card">
       <h3>Exporter une sauvegarde</h3>
       <p style="color:var(--muted); font-size:13px;">Téléchargez un fichier .json contenant l'ensemble des données (fiches, photos, sorties, sanctions, chambres, présences, journal...).</p>
+      <p style="font-size:12.5px; margin:6px 0 0; ${joursDepuisDerniereSauvegarde()===null||joursDepuisDerniereSauvegarde()>30?'color:var(--amber-dark,#8a6300); font-weight:600;':'color:var(--green);'}">${joursDepuisDerniereSauvegarde()===null?'⚠ Aucune sauvegarde manuelle jamais faite':(joursDepuisDerniereSauvegarde()>30?'⚠ Dernière sauvegarde manuelle il y a '+joursDepuisDerniereSauvegarde()+' jours':'✓ Dernière sauvegarde manuelle il y a '+joursDepuisDerniereSauvegarde()+' jour(s)')}</p>
       <div class="btn-row" style="margin-top:8px;"><button class="btn" id="bkExport">Exporter une sauvegarde (.json)</button></div>
     </div>
     <div class="card">
@@ -4085,6 +4246,8 @@ function renderSauvegarde(main){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download=`internat-sauvegarde-${todayISO()}.json`; a.click();
     URL.revokeObjectURL(url);
+    STATE.settings.derniereSauvegardeManuelle = Date.now();
+    persist('settings');
     showToast('Sauvegarde téléchargée');
   };
   if(admin){
