@@ -280,6 +280,8 @@ tr:hover td{background:var(--blue-light);}
 .gallery-skel{width:100%; height:100%; background:linear-gradient(100deg, var(--blue-light) 30%, var(--line) 50%, var(--blue-light) 70%); background-size:200% 100%; animation:skel 1.3s infinite;}
 @keyframes skel{ 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
 .gallery-caption{position:absolute; left:0; right:0; bottom:0; background:linear-gradient(transparent, rgba(0,0,0,.65)); color:#fff; font-size:10.5px; padding:14px 8px 6px; pointer-events:none;}
+.gallery-check{position:absolute; top:8px; left:8px; width:22px; height:22px; z-index:2; accent-color:var(--blue); cursor:pointer;}
+.gallery-item.selected{outline:3px solid var(--blue); outline-offset:-3px;}
 
 .cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:6px;}
 .cal-dow{font-weight:700; font-size:11px; color:var(--muted); text-align:center; padding:4px 0; text-transform:uppercase; letter-spacing:.3px;}
@@ -682,6 +684,7 @@ const ICONS = {
   sauvegarde:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14"/></svg>',
   garde:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 11l2 2 4-4"/><line x1="8" y1="17" x2="16" y2="17"/></svg>',
   chev:'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 6l6 6-6 6"/></svg>',
+  etudes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8 4 4 4v14c4 0 6.5 1 8 2.5 1.5-1.5 4-2.5 8-2.5V4c-4 0-6.5 1-8 2.5Z"/><path d="M12 6.5V21"/></svg>',
   planning:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M8 13h8M8 17h5"/></svg>',
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7"/></svg>',
@@ -694,12 +697,12 @@ function logoTag(){
 }
 
 /* ============================= STORAGE ============================= */
-const KEYS = ['internes','chambres','etages','sortiesSemaine','entrainements','sortiesExceptionnelles','sortiesInternat','sanctions','presences','journal','settings','infirmerie','communications','ventes','rapportsGarde','archives','traitements','traitementsPris','documentsEquipe'];
+const KEYS = ['internes','chambres','etages','sortiesSemaine','entrainements','sortiesExceptionnelles','sortiesInternat','sanctions','presences','journal','settings','infirmerie','communications','ventes','rapportsGarde','archives','traitements','traitementsPris','documentsEquipe','etudes'];
 let STATE = {
   internes:[], chambres:[], etages:[], sortiesSemaine:[], entrainements:{},
   sortiesExceptionnelles:[], sortiesInternat:[], sanctions:[], presences:[], journal:[],
   settings:{pin:'1234'}, infirmerie:[], communications:[], ventes:[], rapportsGarde:[], archives:[],
-  traitements:[], traitementsPris:[], documentsEquipe:[]
+  traitements:[], traitementsPris:[], documentsEquipe:[], etudes:[]
 };
 const DEFAULT_INTERNES_RAW = [{"nom": "ASUMU NCHAMA", "prenom": "ALEJANDRO", "genre": "Garçon", "ecole": "Liège", "classe": "1", "statut": "Actif", "responsable": "Nathalie Nonnweiler", "telPapa": "", "telMaman": "0498 80 44 44", "telInterne": "0489 40 63 56", "mail": "nnonnweiler@gmail.com", "adresse": "Rue Docteur Schweitzer 23", "cp": "4040", "localite": "Herstal", "naissance": "2014-07-19", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Atigui", "prenom": "Selim", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Mehdi Atigui", "telPapa": "0483 00 38 75", "telMaman": "0487 61 04 81", "telInterne": "0493 48 55 97", "mail": "elmeduz@hotmail.fr", "adresse": "Rue de l'Espinette 310", "cp": "7390", "localite": "Quaregnon", "naissance": "2008-12-11", "lieuNaissance": "Boussu", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "BALZAT", "prenom": "SAM", "genre": "Garçon", "ecole": "Liège", "classe": "1", "statut": "Actif", "responsable": "Natacha Smets", "telPapa": "0475 20 98 26", "telMaman": "0474 46 00 03", "telInterne": "0470 60 64 17", "mail": "natachasmets@gmail.com", "adresse": "Boonstraat 7", "cp": "1652", "localite": "Alsemberg", "naissance": "2014-01-13", "lieuNaissance": "Uccle", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Hockey ; Allergies : Graminées, bouleau, carottes crues, pommes — Médical : Médocs toute l'année : Bellozal 20mg, Mometazone spray"}, {"nom": "BEMELMANS", "prenom": "LENNY", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Frédéric Bemelmans", "telPapa": "0498 45 80 64", "telMaman": "0494 78 47 96", "telInterne": "0492 07 88 90", "mail": "fred.bemelmans2707@gmail.com", "adresse": "Rue Grand'Rue 193", "cp": "4870", "localite": "Trooz", "naissance": "2008-02-01", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "BIERENS", "prenom": "QUENTIN", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Serge Bierens", "telPapa": "0475 78 46 56", "telMaman": "0478 95 85 07", "telInterne": "0487 46 30 08", "mail": "serge.bierens@gmail.com", "adresse": "Rue de la Saint Martin 15", "cp": "4960", "localite": "Malmedy", "naissance": "2009-10-26", "lieuNaissance": "Arlon", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Chambre avec Liam Russo"}, {"nom": "Bihet", "prenom": "Harry", "genre": "Garçon", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Marie Dubois", "telPapa": "0474 47 84 19", "telMaman": "0494 14 59 84", "telInterne": "0493 39 73 62", "mail": "dub-marie@hotmail.com", "adresse": "Parc du Bay Bonnet 7/10", "cp": "4620", "localite": "Fléron", "naissance": "2008-02-22", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A-"}, {"nom": "BUJORA", "prenom": "LUCA", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Angèla Bujora", "telPapa": "", "telMaman": "0465 66 02 60", "telInterne": "0465 48 55 06", "mail": "b.jora.a@outlook.fr", "adresse": "Avenue Gounod 72/2", "cp": "1070", "localite": "Bruxelles", "naissance": "2011-05-24", "lieuNaissance": "Satumare (Roumanie)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "CABAY", "prenom": "TIMOTHE", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Anne-Catherine Bolsée", "telPapa": "", "telMaman": "0494 94 78 36", "telInterne": "0495 82 92 38", "mail": "acbolsee@hotmail.com", "adresse": "Rue Louis 44", "cp": "4610", "localite": "Bellaire", "naissance": "2010-01-02", "lieuNaissance": "Chênée", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Callens", "prenom": "Rayan", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Sébastien Callens", "telPapa": "0475 50 21 53", "telMaman": "0474 13 33 72", "telInterne": "0472 92 17 34", "mail": "meltingsport@hotmail.com", "adresse": "Avenue Hyppocrate 4 boite 111", "cp": "1932", "localite": "Sint-Stevens Woluwe", "naissance": "2010-03-04", "lieuNaissance": "Woluwe Saint Lambert", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : B+"}, {"nom": "Carreto Villar", "prenom": "Noah", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Patricia Rumfels", "telPapa": "0476 63 70 37 (tut)", "telMaman": "0495 20 70 71 (tut)", "telInterne": "0473 35 27 50", "mail": "patrumfels@hotmail.com", "adresse": "Rue des Wallons 103", "cp": "4000", "localite": "Liège", "naissance": "2010-01-12", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Coibion", "prenom": "Quentin", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Thierry Coibion", "telPapa": "00352 621 667 153", "telMaman": "0497 37 76 49", "telInterne": "0492 09 87 90", "mail": "thierry@coibion.be", "adresse": "Avenue du Bois d'Arlon 170", "cp": "6700", "localite": "Arlon", "naissance": "2010-01-06", "lieuNaissance": "Arlon", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Cormann", "prenom": "Axel", "genre": "Garçon", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Audrey Derouane", "telPapa": "0487 12 55 29", "telMaman": "0471 71 30 80", "telInterne": "0456 25 31 88", "mail": "audreydr@gmail.com + anguiliki@live.be  (papa)", "adresse": "Rue Gustave Taillard 29B/11", "cp": "4650", "localite": "Herve", "naissance": "2007-12-25", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "CRIGNON", "prenom": "RYAN", "genre": "Garçon", "ecole": "Léon Mignon", "classe": "4", "statut": "Actif", "responsable": "David Crignon", "telPapa": "0033 676 14 44 34", "telMaman": "0033 678 07 86 10", "telInterne": "0033 651 71 82 44", "mail": "david.crignon@decathlon.com", "adresse": "Le Petit Coutant 880", "cp": "F 59440", "localite": "Dompierre sur Helpe (Fr)", "naissance": "2010-06-02", "lieuNaissance": "Fourmies (France)", "droitImage": "Oui", "sortieMercredi": "Oui", "nouveau": true, "notes": "Groupe sanguin : O-"}, {"nom": "DAHMANI", "prenom": "ANTONIN", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Sandrine Puppin", "telPapa": "0486 92 35 45", "telMaman": "0474 98 82 47", "telInterne": "0491 52 66 72", "mail": "sandrine.puppin@gmail.com", "adresse": "Passage du Marquis de la Valette 3", "cp": "4280", "localite": "Hannut", "naissance": "2011-04-21", "lieuNaissance": "Namur", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Chambre avec G.Feier"}, {"nom": "Decoeur", "prenom": "Alystaire", "genre": "Garçon", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Laurence Evrard", "telPapa": "0497 24 64 61", "telMaman": "0472 79 19 61", "telInterne": "", "mail": "laurenceevrard280179@gmail.com", "adresse": "Rue Albin Body 47", "cp": "4900", "localite": "Spa", "naissance": "2013-01-30", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Frère d'Amyline"}, {"nom": "DEJARDIN", "prenom": "GAUTHIER", "genre": "Garçon", "ecole": "Léon Mignon", "classe": "4", "statut": "Actif", "responsable": "Aurore Déjardin", "telPapa": "0033 684 51 70 86", "telMaman": "0033 615 93 16 12", "telInterne": "0033 760 35 69 34", "mail": "aurore_dovay@orange.fr", "adresse": "Rue Gaston Blanchard 22", "cp": "F 80170", "localite": "Wiencourt l'Equipée (Fr)", "naissance": "2011-10-10", "lieuNaissance": "Amiens (France)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "DELWARTE", "prenom": "IHVAN", "genre": "Garçon", "ecole": "Léon Mignon", "classe": "4", "statut": "Actif", "responsable": "Thibault Hery", "telPapa": "0033 777 88 27 20", "telMaman": "0033 750 85 82 05", "telInterne": "0033 682 73 41 67", "mail": "famille.hery30@gmail.com", "adresse": "Rue des Muriers 348", "cp": "F 30130", "localite": "Pont Saint Esprit (Fr)", "naissance": "2011-04-07", "lieuNaissance": "Valence (France)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Demyanov", "prenom": "Victor", "genre": "Garçon", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Galina Nefedova", "telPapa": "", "telMaman": "0487 83 54 85", "telInterne": "0472 69 63 07", "mail": "ngalinan30@gmail.com", "adresse": "Cahay 67", "cp": "6690", "localite": "Vielsalm", "naissance": "2008-03-21", "lieuNaissance": "Woluwe Saint-Lambert", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "DESCHEPPER", "prenom": "GUILLAUME", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Christel Ledecq", "telPapa": "0477 25 77 23", "telMaman": "0476 21 44 05", "telInterne": "0470 40 49 49", "mail": "christel.ledecq@me.com", "adresse": "Rue de l'Ornay 23 A", "cp": "1435", "localite": "Mont Saint Guibert", "naissance": "2012-11-05", "lieuNaissance": "Ottignies", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Allergies : Non — Groupe sanguin : O-"}, {"nom": "DJIKE ABENA", "prenom": "GILCHRIST MICHEL", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Richard Abena", "telPapa": "0488 08 33 36", "telMaman": "0499 82 00 77", "telInterne": "0472 70 23 48", "mail": "abenamarleine76@gmail.com", "adresse": "Rue des Pierres 90", "cp": "4100", "localite": "Seraing", "naissance": "2012-04-16", "lieuNaissance": "Yanoundé (Cameroun)", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Allergies : Non"}, {"nom": "DUBOIS", "prenom": "HUGO", "genre": "Garçon", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Alain Dubois", "telPapa": "0473 24 51 90", "telMaman": "0497 54 80 30", "telInterne": "0497 54 80 30", "mail": "alain@griffe-event.eu", "adresse": "Rue Bi Du Moulin, Chêne 73", "cp": "6860", "localite": "Ebly", "naissance": "2013-06-07", "lieuNaissance": "Libramont", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Frère de Louis"}, {"nom": "DUBOIS", "prenom": "LOUIS", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Alain Dubois", "telPapa": "0473 24 51 90", "telMaman": "0497 54 80 30", "telInterne": "0497 54 80 30", "mail": "alain@griffe-event.eu", "adresse": "Rue Bi Du Moulin, Chêne 73", "cp": "6860", "localite": "Ebly", "naissance": "2011-03-06", "lieuNaissance": "Libramont", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Frère de Hugo"}, {"nom": "DUFOUR", "prenom": "MAHO", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Elodie Guimard", "telPapa": "0033 631 96 53 00", "telMaman": "0033 648 80 15 68", "telInterne": "0033 760 17 82 29", "mail": "guimardelodie12@gmail.com", "adresse": "Rue Hescques 3", "cp": "F 59000", "localite": "Valenciennes", "naissance": "2011-09-12", "lieuNaissance": "Mulhouse (France)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "DUMONT", "prenom": "COLIN", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Emmanuelle Lincé", "telPapa": "0478 95 21 53", "telMaman": "0474 84 75 11", "telInterne": "0471 59 38 56", "mail": "emmanuelle_lince@hotmail.com", "adresse": "Rue de la Fontaine 24", "cp": "5580", "localite": "Buissonville", "naissance": "2012-03-04", "lieuNaissance": "Namur", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Basket ; Allergies : Acariens"}, {"nom": "EKOFO", "prenom": "CAMERON", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Mylène Cheta", "telPapa": "", "telMaman": "0492 52 00 42", "telInterne": "0490 39 40 22", "mail": "cheta.mylene@yahoo.com", "adresse": "Rue de Tainier 26", "cp": "4100", "localite": "Seraing", "naissance": "2012-06-14", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "El Alaoui", "prenom": "Mohamed Reda", "genre": "Garçon", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Dina Sebbagh", "telPapa": "0465 42 99 23", "telMaman": "0465 15 02 65", "telInterne": "0470 84 77 32", "mail": "dinasebbagh@hotmail.com", "adresse": "Clos du Château d'eau 2/b006", "cp": "1130", "localite": "Haren", "naissance": "2006-07-12", "lieuNaissance": "Malaga (Espagne)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "FEIER", "prenom": "GABRIEL", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Ana Crainic-Bodea", "telPapa": "0477 33 35 40", "telMaman": "0498 54 30 60", "telInterne": "0471 64 88 04", "mail": "lavifeier2@gmail.com", "adresse": "Rue Raymond Pasleau 19", "cp": "4280", "localite": "Hannut", "naissance": "2010-04-14", "lieuNaissance": "Liège", "droitImage": "Oui", "sortieMercredi": "Oui", "nouveau": true, "notes": "Chambre avec A.Dahmani ; Allergies : Non"}, {"nom": "Fernandez-Leal", "prenom": "Samuel", "genre": "Garçon", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Vanessa Torrieri", "telPapa": "0486 85 76 64", "telMaman": "0498 66 32 75", "telInterne": "0498 60 79 89", "mail": "torrierivanessa979@gmail.com", "adresse": "Rue Profondval 139", "cp": "4400", "localite": "Flémalle", "naissance": "2008-12-30", "lieuNaissance": "Rocourt", "droitImage": "Oui", "sortieMercredi": "Oui", "nouveau": false, "notes": "Allergies : Non — Groupe sanguin : O+"}, {"nom": "FEWSTER", "prenom": "LIAM", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Timothy Fewster", "telPapa": "0475 98 31 22", "telMaman": "0479 21 73 35", "telInterne": "0488 26 79 54", "mail": "christinefuentes73@gmail.com (maman)", "adresse": "Rue du Biamont 35", "cp": "1350", "localite": "Orp-Jauche", "naissance": "2010-10-14", "lieuNaissance": "Tirlemont", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "FISSET", "prenom": "DIEGO", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Vanessa Jacob", "telPapa": "0474 49 96 71", "telMaman": "0495 77 20 48", "telInterne": "0497 40 93 39", "mail": "vanessa.jacob@outlook.be", "adresse": "Rue Gustave Trasenster 98", "cp": "4102", "localite": "Ougrée", "naissance": "2012-06-16", "lieuNaissance": "Liége", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": false, "notes": "Basket ; Allergies : Non — Médical : 4 Opérations aux oreilles , Amygdales et Végétations — Groupe sanguin : A+"}, {"nom": "FLEIS", "prenom": "ALEXY", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "David Fleis", "telPapa": "0475 48 99 38", "telMaman": "0473 38 45 98", "telInterne": "0455 13 96 56", "mail": "etsdavidfleis@hotmail.com", "adresse": "Rue de Golias 20", "cp": "6250", "localite": "Presle", "naissance": "2010-03-06", "lieuNaissance": "Montigny-le Tilleul", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Gemine", "prenom": "Aurélien", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Michaël Gemine", "telPapa": "0495 63 42 26", "telMaman": "0494 98 98 52", "telInterne": "0484 48 32 40", "mail": "godfroidgemine@yahoo.fr (maman)", "adresse": "Cité CFL 35", "cp": "L-4722", "localite": "Pétange", "naissance": "2009-03-14", "lieuNaissance": "Luxembourg", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Grandjean", "prenom": "Maxime", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Priscille Arnaud", "telPapa": "0493 04 86 76", "telMaman": "0471 40 28 41", "telInterne": "0493 94 77 40", "mail": "priscille.arnaud@hotmail.com", "adresse": "Avenue Molière 274 boite 1", "cp": "1180", "localite": "Uccle", "naissance": "2009-06-23", "lieuNaissance": "Bruxelles", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "GUERENNE", "prenom": "ROAN", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Vanessa Heinen", "telPapa": "0496 58 69 38", "telMaman": "0492 31 45 01", "telInterne": "0471 51 47 25", "mail": "vanessah2o@hotmail.com", "adresse": "Rue de Diekirch 193", "cp": "6700", "localite": "Arlon", "naissance": "2012-01-12", "lieuNaissance": "Arlon", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Allergies : Non — Groupe sanguin : A+"}, {"nom": "HALLEUX", "prenom": "LEO", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Pascal Halleux", "telPapa": "0492 52 50 60", "telMaman": "0486 66 18 44", "telInterne": "0493 91 71 95", "mail": "fc452496@gmail.com", "adresse": "Rue Haute Rochette 122", "cp": "4400", "localite": "Flémalle", "naissance": "2008-09-04", "lieuNaissance": "Liège", "droitImage": "Oui", "sortieMercredi": "Oui", "nouveau": true, "notes": "Allergies : Acariens — Médical : Double fracture au bras droit — Groupe sanguin : O-"}, {"nom": "HAZARD", "prenom": "NATEO", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Benjamin Hazard", "telPapa": "0493 88 12 50", "telMaman": "0475 67 96 10", "telInterne": "0492 54 43 64", "mail": "b.hazard8@hotmail.fr", "adresse": "Rue Armand Dewolf 15", "cp": "1357", "localite": "Hélécine", "naissance": "2010-11-29", "lieuNaissance": "Laeken", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Basket"}, {"nom": "HINOJO CARTES", "prenom": "ERIC", "genre": "Garçon", "ecole": "Jupille", "classe": "3", "statut": "Actif", "responsable": "Mery Cartes", "telPapa": "0484 10 93 33", "telMaman": "0486 37 96 19", "telInterne": "0490 43 76 99", "mail": "merycartes80@gmail.com", "adresse": "Leuvensesteenweg 486", "cp": "1930", "localite": "Zaventem", "naissance": "2011-01-31", "lieuNaissance": "Barcelone (Espagne)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Jadot", "prenom": "Maël", "genre": "Garçon", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Aurore Charlier", "telPapa": "0492 10 55 02", "telMaman": "0499 78 28 27", "telInterne": "0490 36 06 07", "mail": "mamjc.87@hotmail.com", "adresse": "Rue Entre deux portes 10", "cp": "4500", "localite": "Huy", "naissance": "2010-05-31", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "Jaupart", "prenom": "Thomas", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Doris Famerée", "telPapa": "00352 661 156 339", "telMaman": "0494 50 55 11", "telInterne": "0493 34 29 87", "mail": "jaupart.fameree@gmail.com", "adresse": "Rue de Rimbiery 97", "cp": "6723", "localite": "Habay-la-Ville", "naissance": "2008-08-06", "lieuNaissance": "Arlon", "droitImage": "Oui", "sortieMercredi": "Oui", "nouveau": false, "notes": "Allergies : Non"}, {"nom": "JORIS", "prenom": "AUGUSTIN", "genre": "Garçon", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Nicolas Joris", "telPapa": "0495 23 10 37", "telMaman": "0497 42 40 38", "telInterne": "0472 65 75 10", "mail": "nicolasjoris@hotmail.com", "adresse": "Rue du Spitron 54", "cp": "6687", "localite": "Flamierge", "naissance": "2013-02-19", "lieuNaissance": "Ettelbrick (Lux)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "KABEYA WA KABEYA", "prenom": "DONDY", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "José Kabeya Wa Kabeya", "telPapa": "0487 84 59 96", "telMaman": "0467 83 58 05 (GF)", "telInterne": "0465 51 12 49", "mail": "kabeyawakabeya@yahoo.fr", "adresse": "Place de la Constitution 2/19", "cp": "1060", "localite": "Saint Gilles", "naissance": "2009-10-18", "lieuNaissance": "Kinshasa (Congo)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "KAPELA", "prenom": "KENAN", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Nicole Nsakala-Luzolo", "telPapa": "0466 04 83 56", "telMaman": "0492 40 55 42", "telInterne": "0497 63 56 05", "mail": "nicolekapela57@gmail.com", "adresse": "Rue des Bas-Sarts 164", "cp": "4100", "localite": "Seraing", "naissance": "2012-08-24", "lieuNaissance": "Seraing", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "LEFEVRE", "prenom": "GUILLAUME", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Amanda Castiaux", "telPapa": "0485 54 48 47", "telMaman": "0477 75 15 34", "telInterne": "0472 90 22 39", "mail": "amandacastiaux@gmail.com", "adresse": "Rue des Gottes 5", "cp": "4051", "localite": "Vaux-sous-Chèvremont", "naissance": "2011-01-17", "lieuNaissance": "Saint Vith", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Leguebe", "prenom": "Erwann", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Christine Calluso", "telPapa": "0473 28 55 65", "telMaman": "0470 39 56 08", "telInterne": "0483 98 84 36", "mail": "chris.calluso@gmail.com", "adresse": "Place Jean-Baptiste Falise 6", "cp": "6600", "localite": "Bastogne", "naissance": "2011-03-23", "lieuNaissance": "Bruxelles", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "LEROY", "prenom": "AARON", "genre": "Garçon", "ecole": "Jupille", "classe": "2", "statut": "Actif", "responsable": "Mickaël Leroy", "telPapa": "0471 61 50 86", "telMaman": "0477 16 87 46", "telInterne": "0470 81 55 80", "mail": "leroy-mickael@hotmail.com", "adresse": "Grand'Route 6", "cp": "4610", "localite": "Beyne-Heusay", "naissance": "2012-03-16", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "LUST", "prenom": "CHARLY", "genre": "Garçon", "ecole": "Liège", "classe": "1", "statut": "Actif", "responsable": "Marie Marchal", "telPapa": "0477 65 92 31", "telMaman": "0476 82 60 37", "telInterne": "", "mail": "m.marchal.lust@gmail.com", "adresse": "Rue Trémouroux 142", "cp": "1360", "localite": "Orbais", "naissance": "2014-09-16", "lieuNaissance": "Braine L'Alleud", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Allergies : Allergique mais on ne sait pas encore à quoi — Médical : Médocs toute l'année : Equazym 20 mg — Groupe sanguin : O+"}, {"nom": "Malm", "prenom": "Mathis Kodjo", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Kossivi Olivier Malm", "telPapa": "0496 49 33 49", "telMaman": "0479 34 71 58", "telInterne": "0493 39 16 24", "mail": "malm.kossivi@gmail.com", "adresse": "Rue d'Enhaive 267", "cp": "5100", "localite": "Jambes", "naissance": "2009-07-13", "lieuNaissance": "Namur", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "Michel", "prenom": "Jarod", "genre": "Garçon", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Janick Michel", "telPapa": "0497 51 76 77", "telMaman": "0484 64 35 91", "telInterne": "", "mail": "janick.michel@gmail.com", "adresse": "Rue des Gottes 43", "cp": "4287", "localite": "Lincent", "naissance": "2008-04-28", "lieuNaissance": "Woluwe-saint-lambert", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "MICHEL", "prenom": "JULES", "genre": "Garçon", "ecole": "Lycée Jean Boets", "classe": "4 ou 5", "statut": "Actif", "responsable": "Coralie Pigny", "telPapa": "0033 688 45 43 73", "telMaman": "0033 677 21 07 48", "telInterne": "0033 670 33 00 52", "mail": "coralie1979@hotmail.fr", "adresse": "Rue des Aubry 5", "cp": "70130", "localite": "Neuvelle-Les-La-Charité", "naissance": "2010-01-19", "lieuNaissance": "Besançon (France)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Mpungu Malangu", "prenom": "Alioune", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Nana Torani Nankafu", "telPapa": "0488 15 06 58", "telMaman": "0484 17 33 39", "telInterne": "0491 76 55 47", "mail": "nanatorani@gmail.com", "adresse": "Avenue des Croix de Guerre 123/4", "cp": "1120", "localite": "Bruxelles", "naissance": "2007-02-02", "lieuNaissance": "Ixelles", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "Musakala", "prenom": "Christopher", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Hakim Membo", "telPapa": "0466 13 94 90", "telMaman": "0468 42 74 63", "telInterne": "0490 40 96 56", "mail": "dmhakeem@yahoo.fr", "adresse": "Rue du Champs de Bataille 255", "cp": "7012", "localite": "Flénu", "naissance": "2011-10-25", "lieuNaissance": "Kinshasa (Congo)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "Ndikumana", "prenom": "Jean-Davy", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Potamie Gasage", "telPapa": "0471 49 55 28", "telMaman": "0465 66 18 94", "telInterne": "0471 84 24 23", "mail": "davyndikumana1@gmail.com   (J-D)", "adresse": "Cour Saint Gilles 31", "cp": "4000", "localite": "Liège", "naissance": "2007-09-20", "lieuNaissance": "Bujumbura (Burundi)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A-"}, {"nom": "Ngaha", "prenom": "Adrien", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Emilie Hobé", "telPapa": "0488 87 95 11", "telMaman": "0491 50 23 79", "telInterne": "0471 61 06 41", "mail": "emiliehobe@hotmail.fr", "adresse": "Rue Félix Protin 64", "cp": "5060", "localite": "Auvelais", "naissance": "2008-12-03", "lieuNaissance": "Sambreville", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "NSHIMIRIMANA", "prenom": "DON-GABRIEL", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Jean-Berchmans Nshimirimana", "telPapa": "0476 22 85 61", "telMaman": "0466 15 26 14", "telInterne": "0471 67 25 37", "mail": "jbnnshimir@yahoo.fr", "adresse": "Rue du Centre 62", "cp": "4000", "localite": "Liège", "naissance": "2009-01-28", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "PIETTE", "prenom": "NAEL", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Stéphanie Remacle", "telPapa": "0470 83 57 41", "telMaman": "0494 10 06 09", "telInterne": "0472 50 90 49", "mail": "stephanie.remacle1986@gmail.com", "adresse": "Sart-Hennard 122", "cp": "6692", "localite": "Petit-Thier", "naissance": "2011-11-18", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Basket"}, {"nom": "Pitz", "prenom": "Silias", "genre": "Garçon", "ecole": "Jupille", "classe": "4", "statut": "Actif", "responsable": "Linda Hompesch", "telPapa": "0477 08 57 48", "telMaman": "0496 76 11 74", "telInterne": "0494 14 67 51", "mail": "linda.hompesch@gmail.com", "adresse": "Rue de la Montagne 21", "cp": "4720", "localite": "La Calamine", "naissance": "2010-03-17", "lieuNaissance": "Eupen", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Plunus", "prenom": "Timothée", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "David Plunus", "telPapa": "0496 32 97 63", "telMaman": "0496 07 54 98", "telInterne": "0473 41 13 39", "mail": "david.plunus@outlook.be", "adresse": "Fays de José 75", "cp": "4651", "localite": "Battice", "naissance": "2011-09-06", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "PUELINCKX", "prenom": "THEO", "genre": "Garçon", "ecole": "Jupille", "classe": "4", "statut": "Actif", "responsable": "Marie-Noëlle Wiertz", "telPapa": "0475 66 88 77", "telMaman": "0497 76 78 30", "telInterne": "0499 10 52 47", "mail": "marino076@hotmail.com", "adresse": "Clos des Charmes 6", "cp": "4840", "localite": "Welkenraedt", "naissance": "2010-12-20", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Rens", "prenom": "Noa", "genre": "Garçon", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Laurent Rens", "telPapa": "0497 72 98 95", "telMaman": "0497 70 03 65", "telInterne": "0491 93 56 94", "mail": "laurentrens@outlook.be", "adresse": "Rue des Courtsaille 5", "cp": "6536", "localite": "Thuillies", "naissance": "2009-08-10", "lieuNaissance": "Montigny-le-Tilleul", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A-"}, {"nom": "RUSSO", "prenom": "LIAM", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Philippe Russo", "telPapa": "0496 23 23 19", "telMaman": "0499 38 10 71", "telInterne": "0487 48 64 91", "mail": "russophilippe@gmail.com", "adresse": "Rue du Werhe 37 A", "cp": "4950", "localite": "Waimes", "naissance": "2010-11-10", "lieuNaissance": "Saint Vith", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": "Chambre avec Quentin Bierens"}, {"nom": "Shourbaji", "prenom": "Ismaël", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Jihad Shourbaji", "telPapa": "0496 15 58 30", "telMaman": "0471 76 67 54", "telInterne": "0455 13 86 72", "mail": "shourbajiji@hotmail.com", "adresse": "Clos de l'Amandier 2", "cp": "6800", "localite": "Libramont", "naissance": "2009-08-18", "lieuNaissance": "Libramont", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "Sion", "prenom": "Bryan", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Audrey Tricnaux", "telPapa": "0470 92 34 67 (B-P)", "telMaman": "0468 37 30 23", "telInterne": "0455 17 67 73", "mail": "audreytricnaux2@gmail.com", "adresse": "Rue des Fonzays 49", "cp": "6990", "localite": "Hotton", "naissance": "2010-11-14", "lieuNaissance": "Aye", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "SMETS", "prenom": "JOAKIM", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Arnaud Smets", "telPapa": "0476 79 67 61", "telMaman": "0471 36 62 35", "telInterne": "0471 26 45 04", "mail": "arnaudsmets25@gmail.com", "adresse": "Rue de la Hallette 51", "cp": "4041", "localite": "Herstal", "naissance": "2011-11-21", "lieuNaissance": "Liège", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Basket ; Allergies : Non — Groupe sanguin : O"}, {"nom": "Soltani", "prenom": "Levan", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Safia Soltani", "telPapa": "", "telMaman": "0470 26 01 54", "telInterne": "0470 44 59 33", "mail": "safia.soltani@gmail.com", "adresse": "Rue du Verger 2", "cp": "1160", "localite": "Auderghem", "naissance": "2011-11-08", "lieuNaissance": "Aubervilliers (France)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "STELLATO", "prenom": "RAFAELE", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Marie-Christine Brierre", "telPapa": "0471 80 42 25", "telMaman": "0485 47 04 48", "telInterne": "0493 35 45 90", "mail": "brierrechristina@yahoo.fr", "adresse": "Rue du Boussois 11", "cp": "F 59600", "localite": "Elesmes (Fr)", "naissance": "2012-02-10", "lieuNaissance": "Mons", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Basket ; Allergies : Non — Groupe sanguin : AB+"}, {"nom": "THEISSEN", "prenom": "ZACHARY", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Christelle Arend", "telPapa": "0477 63 57 54", "telMaman": "0478 33 36 56", "telInterne": "0478 09 26 30", "mail": "christellearend@hotmail.com", "adresse": "Rue Haute Ransy 18", "cp": "4051", "localite": "Vaux-sous-Chèvremont", "naissance": "2012-01-31", "lieuNaissance": "Chênée", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Basket ; Allergies : Non — Médical : Appendicite en 2018 — Groupe sanguin : O+"}, {"nom": "THONET", "prenom": "ERWIN", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Yves Thonet", "telPapa": "0496 07 83 39", "telMaman": "", "telInterne": "0472 17 27 17", "mail": "thonetyves10@gmail.com", "adresse": "Place Licourt 42/21", "cp": "4040", "localite": "Herstal", "naissance": "2026-04-27", "lieuNaissance": "Rocourt", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Titi Nzang", "prenom": "Yann Elysée", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Nadège Mawamba", "telPapa": "0489 89 28 86", "telMaman": "0499 82 28 37", "telInterne": "0465 46 76 28", "mail": "florynade@hotmail.fr", "adresse": "Beukenlaan 25", "cp": "9320", "localite": "Alost", "naissance": "2009-11-11", "lieuNaissance": "Cameroun", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "Vancheri", "prenom": "Lucas", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Dominique Vancheri", "telPapa": "0495 33 17 59", "telMaman": "Décédée", "telInterne": "0489 89 40 29", "mail": "vancheridomenico4@gmail.com", "adresse": "Avenue Brigade Piron 11/17", "cp": "4020", "localite": "Bressoux", "naissance": "2010-09-29", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Vanaschen", "prenom": "Matthew", "genre": "Garçon", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Sylvie Laschet", "telPapa": "0474 97 63 56", "telMaman": "0497 72 63 83", "telInterne": "0479 15 38 37", "mail": "slaschet86@hotmail.com", "adresse": "Käskorb 3", "cp": "4720", "localite": "Kelmis", "naissance": "2010-03-15", "lieuNaissance": "Eupen", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "VANVAL", "prenom": "HUGO", "genre": "Garçon", "ecole": "Jupille", "classe": "4", "statut": "Actif", "responsable": "Anne Moerenhout", "telPapa": "", "telMaman": "0476 61 02 59", "telInterne": "0493 29 89 59", "mail": "anne.moerenhout@gmail.com", "adresse": "Place Gustave Baugniet 2B", "cp": "1390", "localite": "Grez-Doiceau", "naissance": "2010-04-16", "lieuNaissance": "Ottignies Louvain La Neuve", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "VERHEUST", "prenom": "LENNY", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Bélinda Devaux", "telPapa": "0492 75 05 95", "telMaman": "0476 30 99 80", "telInterne": "0493 83 22 56", "mail": "debelicha@gmail.com", "adresse": "Avenue de la Gare 5", "cp": "1300", "localite": "Limal", "naissance": "2012-01-02", "lieuNaissance": "Laken", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Vitoux", "prenom": "Célian", "genre": "Garçon", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Anne-Bénédicte Gillet", "telPapa": "0033 662 18 03 58", "telMaman": "0033 680 14 34 13", "telInterne": "0033 608 08 45 77", "mail": "tribu.vitoux@gmail.com", "adresse": "Rue d'Avesnes 41", "cp": "F-59550", "localite": "Prisches (F)", "naissance": "2011-05-01", "lieuNaissance": "Prisches (France)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Frère de Colin"}, {"nom": "Vitoux", "prenom": "Colin", "genre": "Garçon", "ecole": "Liège", "classe": "6", "statut": "Actif", "responsable": "Anne-Bénédicte Gillet", "telPapa": "0033 662 18 03 58", "telMaman": "0033 680 14 34 13", "telInterne": "0033 672 52 06 20", "mail": "tribu.vitoux@gmail.com", "adresse": "Rue d'Avesnes 41", "cp": "F-59550", "localite": "Prisches (F)", "naissance": "2009-04-25", "lieuNaissance": "Prisches (France)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Frère de Célian"}, {"nom": "Watia Tiwa", "prenom": "Robin", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Pascale Geurts", "telPapa": "0499 23 62 73", "telMaman": "0495 61 04 83", "telInterne": "0474 12 13 96", "mail": "pascale.geurts@hotmail.com", "adresse": "Rue Mitoyenne 198", "cp": "4710", "localite": "Lontzen", "naissance": "2012-11-19", "lieuNaissance": "Eupen", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : O+"}, {"nom": "Wilmart", "prenom": "Thibald", "genre": "Garçon", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Thibaut Wilmart", "telPapa": "0479 84 63 28", "telMaman": "0473 81 62 59", "telInterne": "0455 15 11 06", "mail": "thibaut.wilmart@police.belgium.eu", "adresse": "Ruelle du Cuvé 23", "cp": "1350", "localite": "Jauche", "naissance": "2008-12-06", "lieuNaissance": "Namur", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": "Groupe sanguin : A+"}, {"nom": "Yampaka Mutombo", "prenom": "Winandi", "genre": "Garçon", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Mireille Zawadowski", "telPapa": "0479 50 05 93", "telMaman": "0479 50 05 93", "telInterne": "0491 55 39 73", "mail": "mireille_zawadowski@hotmail.com", "adresse": "Rue de la Station 167", "cp": "1640", "localite": "Rhode-Saint-Genèse", "naissance": "2008-03-29", "lieuNaissance": "Kinshasa (Congo)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "YMELE", "prenom": "DARREN", "genre": "Garçon", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Estelle Youmbi", "telPapa": "0467 60 59 47 (B-P)", "telMaman": "0465 37 57 37", "telInterne": "0466 43 43 15", "mail": "estelleyoumbi@gmail.com", "adresse": "Rue Hack 16", "cp": "4852", "localite": "Plombières", "naissance": "2010-01-22", "lieuNaissance": "Lille (France)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "ARCHAMBEAU", "prenom": "AUDE", "genre": "Fille", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Cécile Lallemand", "telPapa": "0472 84 00 83", "telMaman": "0497 94 59 66", "telInterne": "0456 62 81 36", "mail": "lallemand.cecile@gmail.com", "adresse": "Rue Verbuisson 48", "cp": "4910", "localite": "La Reid-Theux", "naissance": "2012-03-22", "lieuNaissance": "Liège", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Basket ; Allergies : Sparadrap — Groupe sanguin : A+"}, {"nom": "Bailly", "prenom": "Elina", "genre": "Fille", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Jennifer Bailly", "telPapa": "", "telMaman": "0470 52 35 77", "telInterne": "", "mail": "jenniferbailly88@gmail.com", "adresse": "Rue Saint Nicolas 182 bte 21", "cp": "4000", "localite": "Liège", "naissance": "2012-12-18", "lieuNaissance": "Simmerath (Allemagne)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Bendotti", "prenom": "Julie", "genre": "Fille", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Alexandra Régimont", "telPapa": "0493 34 54 12", "telMaman": "0491 63 90 84", "telInterne": "0472 26 96 68", "mail": "danbendotti@gmail.com   (papa)", "adresse": "Avenue de Lille 2-285", "cp": "4020", "localite": "Liège", "naissance": "2012-12-05", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Berger", "prenom": "Klara", "genre": "Fille", "ecole": "Université", "classe": "1 ère Kiné", "statut": "Actif", "responsable": "David Berger", "telPapa": "0492 93 40 94", "telMaman": "0499 47 25 28", "telInterne": "0499 15 14 67", "mail": "bergerdavid@hotmail.be", "adresse": "Les Petites Communes 75", "cp": "4970", "localite": "Stavelot", "naissance": "2005-11-22", "lieuNaissance": "Namur", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Bovy", "prenom": "Selena", "genre": "Fille", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Renaud Bovy", "telPapa": "0476 30 43 90", "telMaman": "0474 17 30 34", "telInterne": "0471 40 77 54", "mail": "bovykenan@gmail.com", "adresse": "Rue des Machiroux 10", "cp": "4041", "localite": "Vottem", "naissance": "2013-06-28", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "CHETA", "prenom": "KETHIA", "genre": "Fille", "ecole": "Liège", "classe": "1", "statut": "Actif", "responsable": "Mylène Cheta", "telPapa": "", "telMaman": "0492 52 00 42", "telInterne": "", "mail": "cheta.mylene@yahoo.com", "adresse": "Rue de Tainier 26", "cp": "4100", "localite": "Seraing", "naissance": "2014-02-13", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Couwez", "prenom": "Romane", "genre": "Fille", "ecole": "Jupille", "classe": "6", "statut": "Actif", "responsable": "Franck Baranek (Tuteur)", "telPapa": "0485 95 85 83 (T)", "telMaman": "0477 74 01 17 (T)", "telInterne": "0476 02 97 43", "mail": "franck.baranek@gmail.com", "adresse": "Grand Fond 94 B", "cp": "6692", "localite": "Petit-Thier", "naissance": "2008-01-24", "lieuNaissance": "Halle", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Darck", "prenom": "Inaya", "genre": "Fille", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Mélissa Devos", "telPapa": "0487 49 58 60(BP)", "telMaman": "0470 24 83 47", "telInterne": "0492 78 87 07", "mail": "pdevos.m1511@gmail.com", "adresse": "Rue Etienne Glorieux 45", "cp": "7712", "localite": "Herseaux", "naissance": "2008-10-27", "lieuNaissance": "Tournai", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "DECOEUR", "prenom": "AMYLINE", "genre": "Fille", "ecole": "Liège", "classe": "1", "statut": "Actif", "responsable": "Laurence Evrard", "telPapa": "0497 24 64 61", "telMaman": "0472 79 19 61", "telInterne": "0491 14 97 30", "mail": "laurenceevrard280179@gmail.com", "adresse": "Rue Albin Body 47", "cp": "4900", "localite": "Spa", "naissance": "2014-01-22", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Delignere", "prenom": "Eva", "genre": "Fille", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Benoit Delignere", "telPapa": "0473 22 42 62", "telMaman": "0498 27 78 95", "telInterne": "0474 30 67 94", "mail": "benoit100480@hotmail.com", "adresse": "Rue du Tonbois 20", "cp": "6640", "localite": "Vaux-sur-Sure", "naissance": "2010-06-03", "lieuNaissance": "Wiltz (Lux)", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "DJOUDJONG WAFFO", "prenom": "SAMIRA LIVINE", "genre": "Fille", "ecole": "Liège 1", "classe": "6", "statut": "Actif", "responsable": "Adrien Fernandez", "telPapa": "0499 84 34 26", "telMaman": "0493 60 60 69", "telInterne": "0471 94 15 93", "mail": "fernandezadrien@hotmail.com", "adresse": "Rue Frédéric Nyst 36/3", "cp": "4020", "localite": "Liège", "naissance": "2008-04-01", "lieuNaissance": "Yaoundé (Cameroun)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "DOBROGHII", "prenom": "MIRUNA", "genre": "Fille", "ecole": "?", "classe": "?", "statut": "Actif", "responsable": "Petronela Dobroghii", "telPapa": "", "telMaman": "0484 70 77 73", "telInterne": "0472 77 25 65", "mail": "petrodobroghii@yahoo.com", "adresse": "Avenue Josse Goffin 210", "cp": "1082", "localite": "Berchem Sainte Agathe", "naissance": "2009-12-17", "lieuNaissance": "Bruxelles", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "DROEGHAAG", "prenom": "LEA", "genre": "Fille", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Jérôme Droeghaag", "telPapa": "0491 59 97 39", "telMaman": "0493 14 29 64", "telInterne": "0472 46 22 69", "mail": "jerome.droeghaag@gmail.com", "adresse": "Rue de Moresnet 258", "cp": "4851", "localite": "Gemmenich", "naissance": "2010-11-22", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "El Meskine", "prenom": "Lina", "genre": "Fille", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Jessica Nélis", "telPapa": "0498 56 73 64", "telMaman": "0455 14 45 97", "telInterne": "0455 14 53 78", "mail": "nelis.jessica8588@gmail.com", "adresse": "Rue Joseph Debruche 9", "cp": "4681", "localite": "Oupeye", "naissance": "2011-11-08", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "HABDULAZEEZ", "prenom": "SADE", "genre": "Fille", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Faridat Habdulazeez", "telPapa": "", "telMaman": "0488 34 14 38", "telInterne": "0487 38 34 54", "mail": "habdulazeezfaridat@gmail.com", "adresse": "Rue de la Cathédrale 54/004", "cp": "4000", "localite": "Liège", "naissance": "2011-06-17", "lieuNaissance": "Seraing", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Holota", "prenom": "Daria", "genre": "Fille", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Alexandra Holota", "telPapa": "0489 64 27 93", "telMaman": "0497 23 21 84", "telInterne": "0492 07 00 91", "mail": "holotaalexandra.9@gmail.com", "adresse": "Rue Général Desobry 254", "cp": "6600", "localite": "Noville", "naissance": "2011-11-22", "lieuNaissance": "Arlon", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Leclerc", "prenom": "Louanne", "genre": "Fille", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Philippe Leclerc", "telPapa": "0497 46 44 67", "telMaman": "0471 92 87 83", "telInterne": "0495 56 80 10", "mail": "philippe-leclerc77@yahoo.be", "adresse": "Rue du Tiheull 15", "cp": "4621", "localite": "Retinne", "naissance": "2010-08-25", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Matagne", "prenom": "Lisa-Maria", "genre": "Fille", "ecole": "Jupille", "classe": "5", "statut": "Actif", "responsable": "Manuel Matagne", "telPapa": "0492 41 92 84", "telMaman": "", "telInterne": "0492 41 92 85", "mail": "matagne.manuel@gmail.com", "adresse": "Rue Voie de Liège 16", "cp": "4040", "localite": "Herstal", "naissance": "2009-02-20", "lieuNaissance": "Chênée", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "MWAMBA", "prenom": "TSHIAMBILA", "genre": "Fille", "ecole": "?", "classe": "?", "statut": "Actif", "responsable": "Pascaline Muadi Mutombo", "telPapa": "", "telMaman": "0487 40 82 42", "telInterne": "", "mail": "passymuadi@hotmail.fr", "adresse": "En Neuvice 2/34", "cp": "4000", "localite": "Liège", "naissance": "2012-04-18", "lieuNaissance": "Kinshasa (Congo)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Nélis", "prenom": "Zoé", "genre": "Fille", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Sylvie Deroanne", "telPapa": "0494 51 54 02", "telMaman": "0497 42 06 88", "telInterne": "0493 88 56 49", "mail": "nelisderoanne@yahoo.com", "adresse": "Rue de la Nouvelle Montagne 16", "cp": "4801", "localite": "Stembert", "naissance": "2011-03-08", "lieuNaissance": "Verviers", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "NELISSEN", "prenom": "CHLOE", "genre": "Fille", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Isabelle Paulis", "telPapa": "", "telMaman": "0495 46 55 03", "telInterne": "0470 09 98 28", "mail": "isabellepaulis25@hotmail.com", "adresse": "Rue des Bruyères 1", "cp": "4630", "localite": "Soumagne", "naissance": "2013-01-01", "lieuNaissance": "Rocourt", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "NELISSEN", "prenom": "LUNA", "genre": "Fille", "ecole": "Liège", "classe": "2", "statut": "Actif", "responsable": "Isabelle Paulis", "telPapa": "", "telMaman": "0495 46 55 03", "telInterne": "0460 97 60 44", "mail": "isabellepaulis25@hotmail.com", "adresse": "Rue des Bruyères 1", "cp": "4630", "localite": "Soumagne", "naissance": "2013-01-01", "lieuNaissance": "Rocourt", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Pallara", "prenom": "Kiara", "genre": "Fille", "ecole": "Maria Goretti", "classe": "2", "statut": "Actif", "responsable": "Jessica Naisy", "telPapa": "", "telMaman": "0455 18 28 81", "telInterne": "0455 14 48 97", "mail": "jessica-naisy@hotmaill.com", "adresse": "Rue François Begon 8", "cp": "4400", "localite": "Flémalle", "naissance": "2013-04-04", "lieuNaissance": "Seraing", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "Petit", "prenom": "Léa", "genre": "Fille", "ecole": "Jupille", "classe": "7", "statut": "Actif", "responsable": "Ariane Campin", "telPapa": "0479 47 19 64", "telMaman": "0496 05 69 79", "telInterne": "0470 19 33 57", "mail": "arianecampin2@gmail.com", "adresse": "Rue du Verger de la Tour 1", "cp": "4537", "localite": "Verlaine", "naissance": "2008-07-17", "lieuNaissance": "Liège", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "STENVOT", "prenom": "INAYA", "genre": "Fille", "ecole": "Liège", "classe": "5", "statut": "Actif", "responsable": "Jamela Naciri", "telPapa": "0466 12 25 88", "telMaman": "0493 65 94 90", "telInterne": "0476 08 56 40", "mail": "jamilanac@icloud.com", "adresse": "Rue Lamarche 6/2", "cp": "4100", "localite": "Seraing", "naissance": "2009-08-16", "lieuNaissance": "Seraing", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}, {"nom": "Sunzu", "prenom": "Célia", "genre": "Fille", "ecole": "Liège", "classe": "4", "statut": "Actif", "responsable": "Sophie Shima", "telPapa": "0487 16 84 53", "telMaman": "0486 36 60 48", "telInterne": "0455 13 10 84", "mail": "shimasophie1@gmail.com", "adresse": "Rue Georges Truffaut 116", "cp": "4432", "localite": "Alleur", "naissance": "2011-04-08", "lieuNaissance": "Bruxelles", "droitImage": "", "sortieMercredi": "", "nouveau": false, "notes": ""}, {"nom": "VADALA", "prenom": "THALIA", "genre": "Fille", "ecole": "Jupille", "classe": "3", "statut": "Actif", "responsable": "Cédric Vadala", "telPapa": "0473 83 36 91", "telMaman": "0473 83 39 00", "telInterne": "0493 99 86 72", "mail": "cedric.vadala@outlook.com", "adresse": "Rue Fernand Stilmant 116", "cp": "6240", "localite": "Pironchamps", "naissance": "2011-07-16", "lieuNaissance": "Charleroi", "droitImage": "Oui", "sortieMercredi": "Non", "nouveau": true, "notes": "Allergies : Non"}, {"nom": "YAO", "prenom": "ABIGAELLE", "genre": "Fille", "ecole": "Liège", "classe": "3", "statut": "Actif", "responsable": "Ghislaine Ble Croa", "telPapa": "0465 87 87 64", "telMaman": "0483 53 22 69", "telInterne": "", "mail": "ghislainebc@yahoo.com", "adresse": "Rue de la Gare 8", "cp": "4900", "localite": "Spa", "naissance": "2012-02-20", "lieuNaissance": "Antony (Fr)", "droitImage": "", "sortieMercredi": "", "nouveau": true, "notes": ""}];
 async function loadAll(){
@@ -916,6 +919,7 @@ const TAB_DEFS = [
   {id:'etages', label:'Étages & chambres'},
   {id:'presences', label:'Présences'},
   {id:'journal', label:'Journal de bord'},
+  {id:'etudes', label:'Études'},
   {id:'garde', label:'Rapport de garde'},
   {id:'communications', label:'Communications Direction'},
   {id:'equipe', label:"Gestion de l'équipe"},
@@ -1173,8 +1177,9 @@ function renderTab(){
   const renderers = {
     accueil: renderAccueil, calendrier: renderCalendrier, fiches: renderFiches, urgences: renderUrgences, sorties: renderSorties, entrainements: renderEntrainements,
     couts: renderCouts, sanctions: renderSanctions, etages: renderEtages,
-    presences: renderPresences, journal: renderJournal, garde: renderGarde, communications: renderCommunications, photos: renderPhotos, ventes: renderVentes, equipe: renderEquipe, planning: renderPlanning, sauvegarde: renderSauvegarde
+    presences: renderPresences, journal: renderJournal, etudes: renderEtudes, garde: renderGarde, communications: renderCommunications, photos: renderPhotos, ventes: renderVentes, equipe: renderEquipe, planning: renderPlanning, sauvegarde: renderSauvegarde
   };
+  window.__softRefresh = null; // only set by tabs that opt into a lighter live-sync refresh (see setupLiveSync)
   main.innerHTML = '';
   main.classList.remove('fade-in');
   void main.offsetWidth; // force reflow so the animation restarts
@@ -3074,35 +3079,65 @@ function renderPresences(main){
     if(q) list = list.filter(i=>nomComplet(i).toLowerCase().includes(q));
     return list.slice().sort((a,b)=>nomComplet(a).localeCompare(nomComplet(b)));
   }
+  // Two educators can easily be encoding presences at the same time (two
+  // services, different étages). persist('presences') alone would blindly
+  // overwrite the *entire* array with whatever this browser tab last loaded
+  // — silently erasing whatever the other person just saved. This re-fetches
+  // the freshest copy from the server right before writing, and applies only
+  // this one change on top of it, so two people editing different students
+  // (or even the same étage) no longer clobber each other.
+  async function mergeAndPersistPresenceGroup(date, repas, applyChange){
+    let fresh;
+    try{
+      const r = await window.storage.get('presences', true);
+      fresh = JSON.parse(r.value);
+    }catch(e){ fresh = STATE.presences.slice(); }
+    let g = fresh.find(p=>p.date===date && p.repas===repas);
+    if(!g){ g = { id:uid(), date, repas, statuts:{}, valideEtages:{} }; fresh.push(g); }
+    if(!g.statuts) g.statuts = {};
+    if(!g.valideEtages) g.valideEtages = {};
+    applyChange(g);
+    await window.storage.set('presences', JSON.stringify(fresh), true);
+    STATE.presences = fresh;
+    return g;
+  }
   function cycleStatus(id){
     const g = group(true);
     const cur = statusOf(g, id);
     const next = STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1) % STATUS_ORDER.length];
-    if(next==='unchecked') delete g.statuts[id];
-    else g.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
     const c = chambreOf(id);
     const etageKey = c ? c.etageId : 'none';
-    if(g.valideEtages && g.valideEtages[etageKey]) delete g.valideEtages[etageKey]; // data changed since confirmation — needs reconfirming
-    persist('presences');
+    const apply = freshG=>{
+      if(next==='unchecked') delete freshG.statuts[id];
+      else freshG.statuts[id] = { v: next, par: currentUserName(), ts: Date.now() };
+      if(freshG.valideEtages && freshG.valideEtages[etageKey]) delete freshG.valideEtages[etageKey]; // data changed since confirmation — needs reconfirming
+    };
+    apply(g); // optimistic local update — instant feedback, no waiting on the network
     drawAll();
     const label = next==='present'?'Présent':next==='na'?'Non concerné':next==='absent'?'Absent':'Remis à zéro';
     showToast(`${nomComplet(getInterne(id))} — ${label} ✓`);
     const card = document.querySelector(`.presence-card[data-id="${id}"]`);
     if(card){ card.classList.remove('just-updated'); void card.offsetWidth; card.classList.add('just-updated'); }
+    const date=document.getElementById('pDate').value, repas=document.getElementById('pRepas').value;
+    mergeAndPersistPresenceGroup(date, repas, apply).catch(e=>{ console.error(e); showToast('Erreur de synchronisation — réessayez'); });
   }
   function setAllStatus(status){
     const g = group(true);
+    const list = currentList();
     const affectedEtages = new Set();
-    currentList().forEach(i=>{
-      const c = chambreOf(i.id);
-      affectedEtages.add(c ? c.etageId : 'none');
-      if(status==='unchecked') delete g.statuts[i.id];
-      else g.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
-    });
-    if(g.valideEtages) affectedEtages.forEach(k=>delete g.valideEtages[k]);
-    persist('presences');
+    list.forEach(i=>{ const c = chambreOf(i.id); affectedEtages.add(c ? c.etageId : 'none'); });
+    const apply = freshG=>{
+      list.forEach(i=>{
+        if(status==='unchecked') delete freshG.statuts[i.id];
+        else freshG.statuts[i.id] = { v: status, par: currentUserName(), ts: Date.now() };
+      });
+      if(freshG.valideEtages) affectedEtages.forEach(k=>delete freshG.valideEtages[k]);
+    };
+    apply(g);
     drawAll();
     showToast('Statut mis à jour pour la sélection ✓');
+    const date=document.getElementById('pDate').value, repas=document.getElementById('pRepas').value;
+    mergeAndPersistPresenceGroup(date, repas, apply).catch(e=>{ console.error(e); showToast('Erreur de synchronisation — réessayez'); });
   }
   function etageOptionsList(){
     return [...STATE.etages.map(e=>({key:e.id, label:e.nom})), {key:'none', label:'Non assignés'}].filter(t=>studentsFor(t.key).length>0);
@@ -3136,7 +3171,10 @@ function renderPresences(main){
         document.getElementById('pUnconfirm').onclick = ()=>{
           const g2 = group(true);
           if(g2.valideEtages) delete g2.valideEtages[activeEtage];
-          persist('presences'); drawValidation();
+          drawValidation();
+          const date=document.getElementById('pDate').value, repas=document.getElementById('pRepas').value;
+          mergeAndPersistPresenceGroup(date, repas, freshG=>{ if(freshG.valideEtages) delete freshG.valideEtages[activeEtage]; })
+            .catch(e=>{ console.error(e); showToast('Erreur de synchronisation — réessayez'); });
         };
       } else {
         const ready = students.length>0 && checked===students.length;
@@ -3147,8 +3185,14 @@ function renderPresences(main){
         if(ready) document.getElementById('pConfirm').onclick = ()=>{
           const g2 = group(true);
           if(!g2.valideEtages) g2.valideEtages = {};
-          g2.valideEtages[activeEtage] = { par: currentUserName(), ts: Date.now() };
-          persist('presences'); showToast('Étage confirmé ✓'); drawValidation();
+          const confirmation = { par: currentUserName(), ts: Date.now() };
+          g2.valideEtages[activeEtage] = confirmation;
+          showToast('Étage confirmé ✓'); drawValidation();
+          const date=document.getElementById('pDate').value, repas=document.getElementById('pRepas').value;
+          mergeAndPersistPresenceGroup(date, repas, freshG=>{
+            if(!freshG.valideEtages) freshG.valideEtages = {};
+            freshG.valideEtages[activeEtage] = confirmation;
+          }).catch(e=>{ console.error(e); showToast('Erreur de synchronisation — réessayez'); });
         };
       }
     }
@@ -3247,6 +3291,7 @@ function renderPresences(main){
     ` : `<div class="empty">Aucun appel enregistré pour ce mois.</div>`;
   }
   function drawAll(){ drawTabs(); drawGrid(); drawSummary(); drawHistory(); drawValidation(); }
+  window.__softRefresh = drawAll; // let setupLiveSync() refresh just the grid/stats instead of rebuilding the whole tab (keeps focus, scroll position, and in-progress taps intact when another educator saves at the same time)
   document.getElementById('pAllPresent').addEventListener('click', ()=>setAllStatus('present'));
   document.getElementById('pAllReset').addEventListener('click', ()=>setAllStatus('unchecked'));
   document.getElementById('pPrint').onclick = ()=>{
@@ -3398,6 +3443,152 @@ function gardeAutoSummaryHTML(date){
       <ul style="margin:0; padding-left:18px; font-size:12.5px; line-height:1.8;">${r.items.map(t=>`<li>${t}</li>`).join('')}</ul>
     </div>`).join('');
 }
+/* ============================= ÉTUDES ============================= */
+const ETUDE_ATTITUDE_ORDER = ['non_evalue','bien','moyen','difficile'];
+const ETUDE_ATTITUDE_LABEL = { non_evalue:'Non évalué', bien:'Bien', moyen:'Moyen', difficile:'Difficile' };
+function renderEtudes(main){
+  let activeEtage = 'all';
+  main.innerHTML = `
+    <div class="page-head"><div class="icon-badge">${ICONS.etudes}</div><div><h2>Études</h2><p>Devoirs et interrogations à faire, et évaluation rapide de l'attitude au travail — cliquez sur le badge pour le faire défiler (Non évalué → Bien → Moyen → Difficile → à zéro).</p></div></div>
+    <div class="card">
+      <div class="grid-form">
+        <div class="field"><label>Date</label><input type="date" id="etuDate" value="${todayISO()}"></div>
+        <div class="field" style="grid-column:span 2;"><label>Rechercher un nom</label><input id="etuSearch" placeholder="Rechercher..."></div>
+      </div>
+      <div class="field"><label>Devoir/interro commun à appliquer (facultatif)</label>
+        <div style="display:flex; gap:8px;">
+          <input id="etuCommun" placeholder="ex : Interro de maths jeudi — chapitre 3" style="flex:1;">
+          <button class="btn sm ghost" id="etuCommunGo" style="white-space:nowrap;">Appliquer à la sélection affichée</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="type-tabs" id="etuEtageTabs"></div>
+      <div class="table-wrap" id="etuTableWrap" style="margin-top:10px;"></div>
+    </div>
+    ${collapsible("Historique (par mois)", `
+      <div class="field" style="max-width:220px;"><label>Mois</label><input type="month" id="etuHistMonth" value="${todayISO().slice(0,7)}"></div>
+      <div class="table-wrap" id="etuHistWrap" style="margin-top:10px;"></div>
+    `)}
+  `;
+  function group(createIfMissing){
+    const date = document.getElementById('etuDate').value;
+    let g = STATE.etudes.find(e=>e.date===date);
+    if(!g && createIfMissing){ g = { id:uid(), date, entries:{} }; STATE.etudes.push(g); }
+    return g;
+  }
+  function entryOf(g, id){ return (g && g.entries[id]) || null; }
+  function chambreOf(id){ return STATE.chambres.find(c=>(c.interneIds||[]).includes(id)); }
+  function studentsFor(key){
+    if(key==='all') return STATE.internes;
+    if(key==='none') return STATE.internes.filter(i=>!chambreOf(i.id));
+    return STATE.internes.filter(i=>{ const c=chambreOf(i.id); return c && c.etageId===key; });
+  }
+  function currentList(){
+    const q = document.getElementById('etuSearch').value.trim().toLowerCase();
+    let list = studentsFor(activeEtage);
+    if(q) list = list.filter(i=>nomComplet(i).toLowerCase().includes(q));
+    return list.slice().sort((a,b)=>nomComplet(a).localeCompare(nomComplet(b)));
+  }
+  function touchEntry(g, id, patch){
+    const cur = g.entries[id] || { devoirs:'', attitude:'non_evalue', commentaire:'' };
+    g.entries[id] = { ...cur, ...patch, par: currentUserName(), ts: Date.now() };
+    persist('etudes');
+  }
+  function drawTabs(){
+    const tabs = [{key:'all', label:'Tous'}, ...STATE.etages.map(e=>({key:e.id, label:e.nom})), {key:'none', label:'Non assignés'}];
+    document.getElementById('etuEtageTabs').innerHTML = tabs.map(t=>
+      `<button class="type-tab ${activeEtage===t.key?'active':''}" data-etage="${t.key}">${t.label} (${studentsFor(t.key).length})</button>`
+    ).join('');
+    document.querySelectorAll('#etuEtageTabs .type-tab').forEach(b=>b.addEventListener('click',()=>{ activeEtage=b.dataset.etage; drawAll(); }));
+  }
+  function drawTable(){
+    const g = group(false);
+    const list = currentList();
+    document.getElementById('etuTableWrap').innerHTML = list.length? `
+      <table><thead><tr><th>Interne</th><th>Devoirs / interros à faire</th><th>Attitude</th><th>Commentaire</th></tr></thead>
+      <tbody>${list.map(i=>{
+        const e = entryOf(g, i.id) || { devoirs:'', attitude:'non_evalue', commentaire:'' };
+        const att = e.attitude || 'non_evalue';
+        const attColor = att==='bien'?'green':att==='moyen'?'amber':att==='difficile'?'red':'gray';
+        return `<tr>
+          <td><span class="link-name" data-open-dossier="${i.id}">${nomComplet(i)}</span></td>
+          <td><input type="text" class="etu-devoirs" data-id="${i.id}" value="${(e.devoirs||'').replace(/"/g,'&quot;')}" placeholder="—" style="width:100%; box-sizing:border-box;"></td>
+          <td><button class="badge ${attColor} etu-att" data-id="${i.id}" style="cursor:pointer; border:none;">${ETUDE_ATTITUDE_LABEL[att]}</button></td>
+          <td><button class="btn sm ghost etu-comment" data-id="${i.id}" title="${e.commentaire?'Commentaire : '+e.commentaire.replace(/"/g,'&quot;'):'Ajouter un commentaire'}">${e.commentaire?'💬 Voir':'💬 Ajouter'}</button></td>
+        </tr>`;
+      }).join('')}</tbody></table>
+    ` : `<div class="empty">Aucun interne à afficher.</div>`;
+
+    document.querySelectorAll('.etu-devoirs').forEach(inp=>inp.addEventListener('change', ()=>{
+      const g2 = group(true);
+      touchEntry(g2, inp.dataset.id, { devoirs: inp.value.trim() });
+      showToast('Devoir enregistré ✓');
+    }));
+    document.querySelectorAll('.etu-att').forEach(btn=>btn.addEventListener('click', ()=>{
+      const g2 = group(true);
+      const cur = entryOf(g2, btn.dataset.id);
+      const curAtt = (cur && cur.attitude) || 'non_evalue';
+      const next = ETUDE_ATTITUDE_ORDER[(ETUDE_ATTITUDE_ORDER.indexOf(curAtt)+1) % ETUDE_ATTITUDE_ORDER.length];
+      touchEntry(g2, btn.dataset.id, { attitude: next });
+      const i = getInterne(btn.dataset.id);
+      showToast(`${nomComplet(i)} — ${ETUDE_ATTITUDE_LABEL[next]} ✓`);
+      drawTable();
+    }));
+    document.querySelectorAll('.etu-comment').forEach(btn=>btn.addEventListener('click', ()=>{
+      const g2 = group(true);
+      const cur = entryOf(g2, btn.dataset.id);
+      const i = getInterne(btn.dataset.id);
+      openModal(`<h3>Commentaire — ${nomComplet(i)}</h3>
+        <div class="field"><textarea id="etuCommentText" rows="4" style="width:100%; box-sizing:border-box;">${(cur&&cur.commentaire)||''}</textarea></div>
+        <div class="btn-row" style="margin-top:10px;"><button class="btn sm" id="etuCommentSave">Enregistrer</button><button class="btn sm ghost" id="etuCommentClose">Fermer</button></div>`);
+      document.getElementById('etuCommentClose').onclick = closeModal;
+      document.getElementById('etuCommentSave').onclick = ()=>{
+        touchEntry(group(true), btn.dataset.id, { commentaire: document.getElementById('etuCommentText').value.trim() });
+        closeModal(); showToast('Commentaire enregistré ✓'); drawTable();
+      };
+    }));
+  }
+  function drawHistory(){
+    const monthInput = document.getElementById('etuHistMonth');
+    if(!monthInput || !monthInput.value) return;
+    const month = monthInput.value;
+    const groups = STATE.etudes.filter(g=>(g.date||'').startsWith(month));
+    const list = currentList();
+    const rows = list.map(i=>{
+      let bien=0, moyen=0, difficile=0, devoirsCount=0;
+      groups.forEach(g=>{
+        const e = entryOf(g, i.id);
+        if(!e) return;
+        if(e.attitude==='bien') bien++; else if(e.attitude==='moyen') moyen++; else if(e.attitude==='difficile') difficile++;
+        if(e.devoirs) devoirsCount++;
+      });
+      return { i, bien, moyen, difficile, devoirsCount };
+    }).filter(r=>r.bien||r.moyen||r.difficile||r.devoirsCount);
+    document.getElementById('etuHistWrap').innerHTML = rows.length? `
+      <table><thead><tr><th>Interne</th><th>Bien</th><th>Moyen</th><th>Difficile</th><th>Devoirs notés</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td><span class="link-name" data-open-dossier="${r.i.id}">${nomComplet(r.i)}</span></td>
+        <td>${r.bien}</td><td>${r.moyen}</td><td>${r.difficile}</td><td>${r.devoirsCount}</td>
+      </tr>`).join('')}</tbody></table>
+    ` : `<div class="empty">Aucune donnée pour ce mois.</div>`;
+  }
+  function drawAll(){ drawTabs(); drawTable(); drawHistory(); }
+  document.getElementById('etuDate').addEventListener('change', drawAll);
+  document.getElementById('etuSearch').addEventListener('input', drawAll);
+  document.getElementById('etuHistMonth').addEventListener('change', drawHistory);
+  document.getElementById('etuCommunGo').onclick = ()=>{
+    const texte = document.getElementById('etuCommun').value.trim();
+    if(!texte){ showToast('Rien à appliquer'); return; }
+    const g = group(true);
+    currentList().forEach(i=>touchEntry(g, i.id, { devoirs: texte }));
+    showToast(`Devoir appliqué à ${currentList().length} interne(s) ✓`);
+    drawTable();
+  };
+  drawAll();
+}
+
+
 function renderGarde(main){
   main.innerHTML = `
     <div class="page-head"><div class="icon-badge">${ICONS.garde}</div><div><h2>Rapport de garde</h2><p>Un résumé global de la garde, à l'attention de la Direction — plus besoin d'ouvrir la fiche de chaque interne.</p></div></div>
@@ -3569,6 +3760,7 @@ function renderCommunications(main){
 function renderPhotos(main){
   const admin = isAdmin();
   const noDroitList = STATE.internes.filter(i=>i.droitImage==='Non' && i.statut==='Actif');
+  const selected = new Set();
   main.innerHTML = `
     <div class="page-head"><div class="icon-badge">${ICONS.photos}</div><div><h2>Galerie photos</h2><p>Un espace partagé pour déposer et récupérer des photos — sorties, événements, vie quotidienne.</p></div></div>
     ${noDroitList.length?`<div class="card" style="background:var(--red-light); border-color:var(--red);">
@@ -3581,14 +3773,28 @@ function renderPhotos(main){
       <div id="galUploadStatus" style="margin-top:10px; font-size:12.5px; color:var(--muted);"></div>
     </div>
     <div class="card">
-      <div class="btn-row" style="margin-bottom:14px;">
+      <div class="btn-row" style="margin-bottom:14px; justify-content:space-between;">
         <button class="btn sm ghost" id="galRefresh">${ICONS.refresh||''}Actualiser la galerie</button>
+        ${admin?`<div id="galSelBar" style="display:none;"><button class="btn sm danger" id="galDelSel">${ICONS.trash}Supprimer la sélection (<span id="galSelCount">0</span>)</button> <button class="btn sm ghost" id="galSelClear">Tout désélectionner</button></div>`:''}
       </div>
       <div class="gallery-grid" id="galGrid"><div class="empty">Chargement…</div></div>
     </div>
   `;
-  const PREFIX = 'gallery:';
+  const PREFIX = 'gallery:';       // small doc: thumbnail + metadata — this is
+                                    // all the grid needs, so listing the whole
+                                    // gallery stays fast even with hundreds of
+                                    // photos. The full-resolution image lives
+                                    // in a separate FULL_PREFIX doc, fetched
+                                    // only when a photo is actually opened.
+  const FULL_PREFIX = 'galleryfull:';
+  function updateSelBar(){
+    const bar = document.getElementById('galSelBar');
+    if(!bar) return;
+    bar.style.display = selected.size ? 'block' : 'none';
+    const c = document.getElementById('galSelCount'); if(c) c.textContent = selected.size;
+  }
   async function drawGallery(){
+    selected.clear(); updateSelBar();
     const grid = document.getElementById('galGrid');
     grid.innerHTML = `<div class="empty">Chargement…</div>`;
     let keys;
@@ -3596,7 +3802,7 @@ function renderPhotos(main){
     catch(e){ grid.innerHTML = `<div class="empty">Erreur de chargement : ${e.message||e}</div>`; return; }
     if(!keys.length){ grid.innerHTML = `<div class="empty">Aucune photo pour le moment.</div>`; return; }
     keys = keys.slice().sort().reverse(); // timestamp-prefixed keys, newest first
-    grid.innerHTML = keys.map(k=>`<div class="gallery-item" id="gal-${k}"><div class="gallery-skel"></div></div>`).join('');
+    grid.innerHTML = keys.map(k=>`<div class="gallery-item" id="gal-${k}" data-key="${k}"><div class="gallery-skel"></div></div>`).join('');
     runThrottled(keys, async key=>{
       const el = document.getElementById('gal-'+key);
       if(!el) return;
@@ -3605,27 +3811,73 @@ function renderPhotos(main){
         const data = JSON.parse(r.value);
         const when = data.date ? fmtDate(data.date) : '';
         el.innerHTML = `
-          <img src="${data.url}" alt="">
+          ${admin?`<input type="checkbox" class="gallery-check" data-key="${key}">`:''}
+          <img src="${data.thumb||data.url}" alt="" loading="lazy">
           <div class="gallery-caption">${data.by||''}${data.by&&when?' — ':''}${when}</div>
         `;
         el.querySelector('img').addEventListener('click', ()=>openPhotoViewer(key, data));
+        if(admin){
+          const cb = el.querySelector('.gallery-check');
+          cb.addEventListener('click', ev=>ev.stopPropagation());
+          cb.addEventListener('change', ()=>{
+            if(cb.checked) selected.add(key); else selected.delete(key);
+            el.classList.toggle('selected', cb.checked);
+            updateSelBar();
+          });
+        }
       }catch(e){ el.innerHTML = `<div class="empty" style="font-size:11px;">Erreur</div>`; }
-    }, 4);
+    }, 6);
   }
-  function openPhotoViewer(key, data){
+  async function deleteKeys(keys){
+    await Promise.all(keys.flatMap(k=>[
+      window.storage.delete(k, true).catch(()=>{}),
+      window.storage.delete(FULL_PREFIX + k.slice(PREFIX.length), true).catch(()=>{}),
+    ]));
+  }
+  if(admin){
+    document.getElementById('galSelClear').onclick = ()=>{
+      selected.clear();
+      document.querySelectorAll('.gallery-check').forEach(cb=>{ cb.checked=false; cb.closest('.gallery-item').classList.remove('selected'); });
+      updateSelBar();
+    };
+    document.getElementById('galDelSel').onclick = ()=>{
+      const n = selected.size;
+      if(!n) return;
+      openModal(`<h3>Supprimer ${n} photo${n>1?'s':''} ?</h3><p>Cette action est irréversible.</p>
+        <div class="btn-row"><button class="btn red" id="confirmDelSel">Supprimer</button><button class="btn ghost" id="cancelDelSel">Annuler</button></div>`);
+      document.getElementById('cancelDelSel').onclick = closeModal;
+      document.getElementById('confirmDelSel').onclick = async ()=>{
+        closeModal();
+        showToast(`Suppression de ${n} photo(s)…`);
+        await deleteKeys([...selected]);
+        showToast('Photo(s) supprimée(s)');
+        drawGallery();
+      };
+    };
+  }
+  function openPhotoViewer(key, thumbData){
     openModal(`
       <div style="max-width:80vw;">
-        <img src="${data.url}" alt="" style="width:100%; max-height:65vh; object-fit:contain; border-radius:10px; display:block; background:#000;">
+        <div id="galViewerImgWrap" style="min-height:200px; display:flex; align-items:center; justify-content:center;"><img src="${thumbData.thumb||thumbData.url}" alt="" style="width:100%; max-height:65vh; object-fit:contain; border-radius:10px; display:block; background:#000; filter:blur(4px);"></div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px; flex-wrap:wrap;">
-          <div style="font-size:12.5px; color:var(--muted);">${data.by?('Déposée par '+data.by+(data.date?' le '+fmtDate(data.date):'')):''}</div>
+          <div style="font-size:12.5px; color:var(--muted);">${thumbData.by?('Déposée par '+thumbData.by+(thumbData.date?' le '+fmtDate(thumbData.date):'')):''}</div>
           <div class="btn-row" style="margin:0;">
-            <a class="btn sm ghost" href="${data.url}" download="photo.jpg" target="_blank" rel="noopener">Télécharger</a>
+            <a class="btn sm ghost" id="galDlBtn" href="${thumbData.url||'#'}" download="photo.jpg" target="_blank" rel="noopener">Télécharger</a>
             ${admin?`<button class="btn sm danger" id="galDelBtn">${ICONS.trash}Supprimer</button>`:''}
             <button class="btn sm ghost" id="galCloseBtn">Fermer</button>
           </div>
         </div>
       </div>
     `);
+    // Legacy photos (uploaded before thumbnails existed) already have the
+    // full image right in "url" — only fetch the separate full doc when the
+    // small listing doc doesn't carry it.
+    (thumbData.url ? Promise.resolve(thumbData.url) : window.storage.get(FULL_PREFIX + key.slice(PREFIX.length), true).then(r=>JSON.parse(r.value).url).catch(()=>thumbData.thumb))
+      .then(fullUrl=>{
+        const wrap = document.getElementById('galViewerImgWrap');
+        if(wrap) wrap.innerHTML = `<img src="${fullUrl}" alt="" style="width:100%; max-height:65vh; object-fit:contain; border-radius:10px; display:block; background:#000;">`;
+        const dl = document.getElementById('galDlBtn'); if(dl) dl.href = fullUrl;
+      });
     document.getElementById('galCloseBtn').onclick = closeModal;
     if(admin){
       document.getElementById('galDelBtn').onclick = ()=>{
@@ -3633,7 +3885,7 @@ function renderPhotos(main){
           <div class="btn-row"><button class="btn red" id="confirmDelPhoto">Supprimer</button><button class="btn ghost" id="cancelDelPhoto">Annuler</button></div>`);
         document.getElementById('cancelDelPhoto').onclick = closeModal;
         document.getElementById('confirmDelPhoto').onclick = async ()=>{
-          try{ await window.storage.delete(key, true); showToast('Photo supprimée'); }
+          try{ await deleteKeys([key]); showToast('Photo supprimée'); }
           catch(e){ showToast('Erreur : '+(e.message||e)); }
           closeModal(); drawGallery();
         };
@@ -3661,10 +3913,17 @@ function renderPhotos(main){
     await runThrottled(files, async file=>{
       if(!/^image\/(jpe?g|png)$/.test(file.type)){ done++; statusEl.textContent = `Envoi de ${done}/${files.length}… (fichier ignoré : ${file.name})`; return; }
       try{
-        const dataUri = await compressForFirestore(file);
-        if(dataUri.length >= 900000){ done++; statusEl.textContent = `Envoi de ${done}/${files.length}… (trop grande, ignorée : ${file.name})`; return; }
-        const key = PREFIX + Date.now()+'_'+uid();
-        await window.storage.set(key, JSON.stringify({ url: dataUri, by: currentUserName(), date: todayISO() }), true);
+        const [thumbUri, fullUri] = await Promise.all([
+          fileToCompressedDataURL(file, 220, 0.55),
+          compressForFirestore(file),
+        ]);
+        if(fullUri.length >= 900000){ done++; statusEl.textContent = `Envoi de ${done}/${files.length}… (trop grande, ignorée : ${file.name})`; return; }
+        const suffix = Date.now()+'_'+uid();
+        const by = currentUserName(), date = todayISO();
+        await Promise.all([
+          window.storage.set(PREFIX + suffix, JSON.stringify({ thumb: thumbUri, by, date }), true),
+          window.storage.set(FULL_PREFIX + suffix, JSON.stringify({ url: fullUri }), true),
+        ]);
       }catch(err){ console.error('upload failed for', file.name, err); }
       done++; statusEl.textContent = `Envoi de ${done}/${files.length}…`;
     }, 3);
@@ -3733,7 +3992,7 @@ async function showQrModal(montant, communication){
   try{
     await loadQrLib();
     const text = buildEpcQrString({ bic:s.compteBic, nom:s.compteTitulaire, iban:s.compteIban, montant, communication });
-    new QRCode(document.getElementById('qrCanvasWrap'), { text, width:200, height:200, correctLevel: QRCode.CorrectLevel.M });
+    new QRCode(document.getElementById('qrCanvasWrap'), { text, width:200, height:200, correctLevel: QRCode.CorrectLevel.M, typeNumber: 0 });
     document.getElementById('qrPrint').onclick = ()=>{
       const img = document.querySelector('#qrCanvasWrap img, #qrCanvasWrap canvas');
       const imgSrc = img ? (img.tagName==='IMG'?img.src:img.toDataURL()) : '';
@@ -4457,7 +4716,8 @@ function setupLiveSync(){
     window.storage.watch(key, true, raw=>{
       try{ STATE[key] = JSON.parse(raw); }catch(e){ console.error('Live sync parse error for', key, e); return; }
       if(LIVE_SAFE_TABS.includes(ACTIVE_TAB)){
-        renderTab();
+        if(typeof window.__softRefresh === 'function') window.__softRefresh();
+        else renderTab();
         showToast('Mise à jour reçue');
       }else if(!LIVE_NOTICE_PENDING){
         LIVE_NOTICE_PENDING = true;
