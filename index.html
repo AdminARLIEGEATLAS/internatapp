@@ -3942,32 +3942,29 @@ function renderPhotos(main){
 // needed: it's the exact same standard printed on Belgian invoices.
 let QR_LOAD_PROMISE = null;
 function loadQrLib(){
-  if(window.QRCode) return Promise.resolve();
+  if(window.qrcode) return Promise.resolve();
   if(QR_LOAD_PROMISE) return QR_LOAD_PROMISE;
   QR_LOAD_PROMISE = new Promise((resolve, reject)=>{
     const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
     s.onload = ()=>resolve();
     s.onerror = ()=>{ QR_LOAD_PROMISE = null; reject(new Error('Impossible de charger la bibliothèque QR (vérifiez la connexion internet)')); };
     document.head.appendChild(s);
   });
   return QR_LOAD_PROMISE;
 }
-// The bundled qrcodejs build doesn't reliably auto-size to fit the text
-// (typeNumber:0 isn't honoured the way newer forks do), and its own
-// "code length overflow" error reports capacity numbers that don't line up
-// with the actual text length — so rather than trust it to pick the right
-// size, just try increasing QR versions until one actually succeeds.
+// Switched away from qrcodejs: it wasn't actually honouring the typeNumber
+// option internally (still failing the same way no matter what size was
+// requested), so no amount of retrying a size could ever have worked.
+// qrcode-generator is the original, well-documented reference library —
+// typeNumber 0 is its official, built-in "pick the smallest size that fits"
+// mode, not something inferred from undocumented behaviour.
 function makeQrCodeRobust(container, text, correctLevel){
   container.innerHTML = '';
-  let lastErr;
-  for(let t=1; t<=40; t++){
-    try{
-      new QRCode(container, { text, width:200, height:200, correctLevel, typeNumber:t });
-      return;
-    }catch(e){ lastErr = e; container.innerHTML = ''; }
-  }
-  throw lastErr || new Error('QR : aucune taille compatible trouvée');
+  const qr = window.qrcode(0, correctLevel);
+  qr.addData(text);
+  qr.make();
+  container.innerHTML = qr.createImgTag(5, 4);
 }
 function buildEpcQrString({bic, nom, iban, montant, communication}){
   return [
@@ -4008,7 +4005,7 @@ async function showQrModal(montant, communication){
   try{
     await loadQrLib();
     const text = buildEpcQrString({ bic:s.compteBic, nom:s.compteTitulaire, iban:s.compteIban, montant, communication });
-    makeQrCodeRobust(document.getElementById('qrCanvasWrap'), text, QRCode.CorrectLevel.M);
+    makeQrCodeRobust(document.getElementById('qrCanvasWrap'), text, 'M');
     document.getElementById('qrPrint').onclick = ()=>{
       const img = document.querySelector('#qrCanvasWrap img, #qrCanvasWrap canvas');
       const imgSrc = img ? (img.tagName==='IMG'?img.src:img.toDataURL()) : '';
